@@ -159,8 +159,7 @@ HRESULT STDMETHODCALLTYPE FFBDriver::DownloadEffect(
 	LogMessage(buff);
 #endif
 
-	vibration::VibrationController::StartEffect(dwEffectID, peff, dwID);
-	return S_OK;
+	return vibration::VibrationController::StartEffect(dwEffectID, peff, dwID);
 }
 
 HRESULT STDMETHODCALLTYPE FFBDriver::DestroyEffect(DWORD, DWORD) {
