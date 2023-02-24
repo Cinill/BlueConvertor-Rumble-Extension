@@ -33,7 +33,7 @@
         "DisplayName" = "8:Debug"
         "IsDebugOnly" = "11:TRUE"
         "IsReleaseOnly" = "11:FALSE"
-        "OutputFilename" = "8:..\\Release\\DualShockRumbleExtensionInstaller.msi"
+        "OutputFilename" = "8:..\\Release\\LeadershipTwinTurbo1021.msi"
         "PackageFilesAs" = "3:2"
         "PackageFileSize" = "3:-2147483648"
         "CabType" = "3:1"
@@ -94,7 +94,7 @@
         {
             "{4AA51A2D-7D85-4A59-BA75-B0809FC8B380}:_A58FBA840C67404E868C9D92987CA01A"
             {
-            "Name" = "8:GenericFFBDriver32.dll"
+            "Name" = "8:TwinTurboFFBdrv32.dll"
             "Condition" = "8:"
             "Object" = "8:_CACB481DB8B74D96B26F50DCA0C3F56A"
             "FileType" = "3:1"
@@ -123,8 +123,8 @@
         {
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C378259A8D8C4FB880EAEC27ECC1720F"
             {
-            "SourcePath" = "8:..\\Release\\GenericFFBDriver64.dll"
-            "TargetName" = "8:GenericFFBDriver64.dll"
+            "SourcePath" = "8:..\\Release\\TwinTurboFFBdrv64.dll"
+            "TargetName" = "8:TwinTurboFFBdrv64.dll"
             "Tag" = "8:"
             "Folder" = "8:_08365EDD8FF742F7A8EA90AD36CEE015"
             "Condition" = "8:"
@@ -143,8 +143,8 @@
             }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_CACB481DB8B74D96B26F50DCA0C3F56A"
             {
-            "SourcePath" = "8:..\\Release\\GenericFFBDriver32.dll"
-            "TargetName" = "8:GenericFFBDriver32.dll"
+            "SourcePath" = "8:..\\Release\\TwinTurboFFBdrv32.dll"
+            "TargetName" = "8:TwinTurboFFBdrv32.dll"
             "Tag" = "8:"
             "Folder" = "8:_08365EDD8FF742F7A8EA90AD36CEE015"
             "Condition" = "8:"
@@ -212,7 +212,7 @@
                 {
                     "{9EF0B969-E518-4E46-987F-47570745A589}:_08365EDD8FF742F7A8EA90AD36CEE015"
                     {
-                    "Name" = "8:GenericFFBDriver"
+                    "Name" = "8:TwinTurboFFBdrv"
                     "AlwaysCreate" = "11:FALSE"
                     "Condition" = "8:"
                     "Transitive" = "11:FALSE"
@@ -238,7 +238,7 @@
         "Product"
         {
         "Name" = "8:Microsoft Visual Studio"
-        "ProductName" = "8:DualShock Rumble Extension"
+        "ProductName" = "8:Leadership Twin Turbo 1021"
         "ProductCode" = "8:{50CD8B4D-CD82-49D1-9E0A-2B7887448068}"
         "PackageCode" = "8:{D97234E3-A8F2-4EE2-9CAD-EE6531629B48}"
         "UpgradeCode" = "8:{A08375A2-DC94-4A88-8431-ED8D9717FA62}"
@@ -248,14 +248,14 @@
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
         "ProductVersion" = "8:1.0.0"
-        "Manufacturer" = "8:DualShock Rumble Extension"
+        "Manufacturer" = "8:Leadership"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
         "Title" = "8:DualShock Rumble Extension"
         "Subject" = "8:"
         "ARPCONTACT" = "8:"
         "Keywords" = "8:"
-        "ARPCOMMENTS" = "8:DualShock Rumble Extension"
+        "ARPCOMMENTS" = "8:Leadership Gamer TwinTurbo Steering Wheel driver"
         "ARPURLINFOABOUT" = "8:"
         "ARPPRODUCTICON" = "8:"
         "ARPIconIndex" = "3:0"

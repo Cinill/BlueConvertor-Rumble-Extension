@@ -55,12 +55,12 @@ STDAPI DllRegisterServer(void)
 	CDllRegistrar registrar;  // this class should create standard entries in registry 
 	CHAR path[MAX_PATH];
 	GetModuleFileNameA((HMODULE)g_module, path, MAX_PATH);
-	return registrar.RegisterObject(CLSID_FFBDriver, "GenericFFBDriver", "FFBDriver", path) ? S_OK : S_FALSE;
+	return registrar.RegisterObject(CLSID_FFBDriver, "TwinTurboFFBdrv", "FFBDriver", path) ? S_OK : S_FALSE;
 }
 
 STDAPI DllUnregisterServer(void)
 {
 	CDllRegistrar registrar;
-	return registrar.UnRegisterObject(CLSID_FFBDriver, "GenericFFBDriver", "FFBDriver") ? S_OK : S_FALSE;
+	return registrar.UnRegisterObject(CLSID_FFBDriver, "TwinTurboFFBdrv", "FFBDriver") ? S_OK : S_FALSE;
 }
 
