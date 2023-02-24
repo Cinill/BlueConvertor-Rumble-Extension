@@ -7,6 +7,10 @@
 #endif // _MSC_VER > 1000
 #include "stdio.h"
 
+#define DEVICE_VID "22BA"
+#define DEVICE_PID "0108"
+#define ROOT_REGISTRY_KEY "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_" DEVICE_VID "&PID_" DEVICE_PID
+
 class CRegistrar
 {
 protected:
@@ -113,6 +117,21 @@ public:
 
 class CDllRegistrar : public CRegistrar
 {
+private:
+	bool mkffbkey(byte keyIdx, byte b1, byte b5, byte b6, byte b9, const char* oemPath, const char* fxName) {
+		char buffer[MAX_PATH];
+		byte data[] = {
+			b1,0x01,0x00,0x00,b5,b6,0x00,0x00,b9,0x03,0x00,0x00,0xed,0x03,0x00,0x00,0x30,0x00,0x00,0x00
+		};
+
+		sprintf_s(buffer, "%s\\Effects\\{13541C2%01X-8E33-11D0-9AD0-00A0C9A06E35}", oemPath, keyIdx);
+
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", fxName) ||
+			!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", data, sizeof(data)))
+			return false;
+
+		return true;
+	}
 public:
 	bool RegisterObject(REFIID riid,LPCSTR LibId,LPCSTR ClassId,LPCSTR Path)
 	{
@@ -132,7 +151,7 @@ public:
 			return false;
 
 	// Root ----------------
-		const char* root = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012";
+		const char* root = ROOT_REGISTRY_KEY;
 		const byte oemData[] = { 
 			0x03, 0x00, 0x08, 0x10, 0x0c, 0x00, 0x00, 0x00
 		};
@@ -140,8 +159,13 @@ public:
 			0x00, 0x00, 0x00, 0x00
 		};
 
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "OEMName", "DualShock Adapter"))
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "OEMName", "Twin Turbo Steering Wheel"))
 			return false;
+
+		// This registry line is in "v5" driver
+		//if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "OEMCallout", "joyhid.vxd"))
+		//	return false;
+
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "OEMData", oemData, 8))
 			return false;
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "DebugLevel", dData, 4))
@@ -149,15 +173,20 @@ public:
 		dData[0] = 0x19;
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "Delay", dData, 4))
 			return false;
+		dData[0] = 0x04;
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "Flags1", dData, 4))
+			return false;
 		dData[0] = 0xe8; dData[1] = 0x03;
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "Amplify", dData, 4))
 			return false;
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "ConfigCLSID", "{B4FE8B13-40D0-438A-B4C2-DE4522951071}"))
-			return false;
+
+		// If you also have a driver for the joystick configuration page, its CLSId comes here.
+		//if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "ConfigCLSID", strCLSID))
+		//	return false;
 	// Root ----------------
 
 	// AXES ----------------	
-		const char* axePath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012\\Axes";
+		const char* axePath = ROOT_REGISTRY_KEY "\\Axes";
 		byte axeAttrData[] = {
 			0x01, 0x81, 0x00, 0x00, 0x01, 0x00, 0x30, 0x00
 		};
@@ -202,7 +231,7 @@ public:
 	// AXES ----------------
 
 	// Buttons -------------
-		const char* btnPath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012\\Buttons";
+		const char* btnPath = ROOT_REGISTRY_KEY "\\Buttons";
 		byte btnData[] = {
 			0x02, 0x80, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00
 		};
@@ -217,9 +246,10 @@ public:
 	// Buttons -------------
 	
 	// ForceFeedback -------
-		const char* oemPath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012\\OEMForceFeedback";
+		const char* oemPath = ROOT_REGISTRY_KEY "\\OEMForceFeedback";
 
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, oemPath, "CLSID", "{B4FE8B13-40D0-438A-B4C2-DE4522951071}"))
+		// This is the class ID for the actual force feedback driver
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, oemPath, "CLSID", strCLSID))
 			return false;
 
 		const byte attrVal[] = {
@@ -236,111 +266,18 @@ public:
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", ""))
 			return false;
 
-		for (int i = 0; i < 12; i++)
-		{
-			sprintf_s(buffer, "%s\\Effects\\{13541C2%01X-8E33-11D0-9AD0-00A0C9A06E35}", oemPath, i);
-
-			switch (i)
-			{
-				case 0:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Constant"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x00,0x00,0x00,0x00,0x01,0x86,0x00,0x00,0xed,0x03,0x00,0x00,0xed,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 1:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Ramp Force"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x01,0x00,0x00,0x00,0x02,0x86,0x00,0x00,0xef,0x03,0x00,0x00,0xef,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 2:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Square Wave"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x02,0x00,0x00,0x00,0x03,0x86,0x00,0x00,0xef,0x03,0x00,0x00,0xef,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 3:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Sine Wave"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x03,0x00,0x00,0x00,0x03,0x86,0x00,0x00,0xef,0x03,0x00,0x00,0xef,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 4:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Triangle Wave"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x04,0x00,0x00,0x00,0x03,0x86,0x00,0x00,0xef,0x03,0x00,0x00,0xef,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 5:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Sawtooth Up Wave"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x05,0x00,0x00,0x00,0x03,0x86,0x00,0x00,0xef,0x03,0x00,0x00,0xef,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 6:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Sawtooth Down Wave"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x06,0x00,0x00,0x00,0x03,0x86,0x00,0x00,0xef,0x03,0x00,0x00,0xef,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 7:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Spring"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x07,0x00,0x00,0x00,0x04,0xd8,0x00,0x00,0x6d,0x03,0x00,0x00,0x6d,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 8:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Damper"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x08,0x00,0x00,0x00,0x04,0xd8,0x00,0x00,0x6d,0x03,0x00,0x00,0x6d,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 9:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Inertia"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x09,0x00,0x00,0x00,0x04,0xd8,0x00,0x00,0x6d,0x03,0x00,0x00,0x6d,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 10:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "Friction"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x0a,0x00,0x00,0x00,0x04,0xd8,0x00,0x00,0x6d,0x03,0x00,0x00,0x6d,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-				case 11:
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", "CustomForce"))
-						return false;
-					if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "Attributes", new byte[]{
-						0x00,0x01,0x00,0x00,0x05,0x86,0x00,0x00,0xef,0x03,0x00,0x00,0xef,0x03,0x00,0x00,0x30,0x00,0x00,0x00
-						}, 20))
-						return false;
-					break;
-			}
-		}
-
+		if (!mkffbkey(0, 0x01, 0x01, 0x86, 0xed, oemPath, "ConstantForce")) return false;
+		if (!mkffbkey(1, 0x02, 0x02, 0x86, 0xef, oemPath, "RampForce")) return false;
+		if (!mkffbkey(2, 0x03, 0x03, 0x86, 0xef, oemPath, "Square")) return false;
+		if (!mkffbkey(3, 0x04, 0x03, 0x86, 0xef, oemPath, "Sine")) return false;
+		if (!mkffbkey(4, 0x05, 0x03, 0x86, 0xef, oemPath, "Triangle")) return false;
+		if (!mkffbkey(5, 0x06, 0x03, 0x86, 0xef, oemPath, "SawtoothUp")) return false;
+		if (!mkffbkey(6, 0x07, 0x03, 0x86, 0xef, oemPath, "SawtoothDown")) return false;
+		if (!mkffbkey(7, 0x08, 0x04, 0xd8, 0x6d, oemPath, "Spring")) return false;
+		if (!mkffbkey(8, 0x09, 0x04, 0xd8, 0x6d, oemPath, "Damper")) return false;
+		if (!mkffbkey(9, 0x0a, 0x04, 0xd8, 0x6d, oemPath, "Inertia")) return false;
+		if (!mkffbkey(10, 0x0b, 0x04, 0xd8, 0x6d, oemPath, "Friction")) return false;
+		if (!mkffbkey(11, 0x0c, 0x05, 0x86, 0xef, oemPath, "CustomForce")) return false;
 	// Effects -------------
 
 		return true;
@@ -355,6 +292,10 @@ public:
 		sprintf_s(buffer,"CLSID\\%s\\InProcServer32",strCLSID);
 		if(!DelFromRegistry(HKEY_CLASSES_ROOT,buffer))
 			return false;
+
+		if (!DelFromRegistry(HKEY_LOCAL_MACHINE, ROOT_REGISTRY_KEY))
+			return false;
+
 		return CRegistrar::UnRegisterObject(riid,LibId,ClassId);
 	}
 

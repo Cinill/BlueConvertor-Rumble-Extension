@@ -2,8 +2,8 @@
 #include <fstream>
 #include <filesystem>
 
-#define DRIVER_x86 "GenericFFBDriver32.dll"
-#define DRIVER_x64 "GenericFFBDriver64.dll"
+#define DRIVER_x86 PROJECTNAME "32.dll"
+#define DRIVER_x64 PROJECTNAME "64.dll"
 
 #ifdef _WIN64
 #define IS_WIN64 TRUE
