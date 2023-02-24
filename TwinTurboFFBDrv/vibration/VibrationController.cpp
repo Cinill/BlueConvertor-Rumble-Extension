@@ -76,7 +76,7 @@ namespace vibration {
 	}
 
 	void VibrationController::VibrationThreadEntryPoint(DWORD dwID)
-	{	
+	{
 		mtxSync.lock();
 		
 		ThreadRef.insert(std::make_pair(std::this_thread::get_id(), dwID));
@@ -182,8 +182,10 @@ namespace vibration {
 		Reset(dwID);
 	}
 
-	void VibrationController::StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID)
+	HRESULT VibrationController::StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID)
 	{
+		LPDIENVELOPE envelope;
+
 		mtxSync.lock();
 
 		int idx = -1;
@@ -206,15 +208,91 @@ namespace vibration {
 		}
 
 		// Calculating intensity
-		byte forceX = 0xfe;
-		byte forceY = 0xfe;
+		byte forceX = 0x0;
+		byte forceY = 0x0;
 
-		byte magnitude = 0xfe;
-		if (peff->cbTypeSpecificParams == 4) {
-			LPDICONSTANTFORCE effParams = (LPDICONSTANTFORCE)peff->lpvTypeSpecificParams;
-			double mag = (((double)effParams->lMagnitude) + 10000.0) / 20000.0;
+		byte magnitude = 0x0;
 
-			magnitude = (byte)(round(mag * 254.0));
+		DWORD specificParamsSize = peff->cbTypeSpecificParams;
+
+		byte fxType = DIEFT_GETTYPE(dwEffectID);
+
+		if (specificParamsSize == 0) {
+			// No specific effects. Go on.
+		} else if (fxType == DIEFT_CONSTANTFORCE && specificParamsSize == sizeof(DICONSTANTFORCE)) {
+			LPDICONSTANTFORCE constantForceParams = (LPDICONSTANTFORCE)peff->lpvTypeSpecificParams;
+			if (peff->lpEnvelope != nullptr) {
+				if (sizeof(*peff->lpEnvelope) != sizeof(DIENVELOPE)) {
+					mtxSync.unlock();
+					return DIERR_INVALIDPARAM;
+				}
+				envelope = peff->lpEnvelope;
+
+				magnitude = (max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX;
+				// dwAttackLevel: initial force (0-10k)
+				// dwAttackTime: time between initial force and lMagnitude (microsseconds)
+				// dwFadeLevel: force after effect ends (0-10k)
+				// dwFadeTime: time between lMagnitude and FadeLevel (microsseconds)
+			} else {
+				// Valid values are -10,000 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
+				magnitude = (max(0, min(DI_FFNOMINALMAX, constantForceParams->lMagnitude)) * 254) / DI_FFNOMINALMAX; // FIXME
+			}
+		} else if (fxType == DIEFT_RAMPFORCE && specificParamsSize == sizeof(DIRAMPFORCE)) {
+			if (peff->lpEnvelope != nullptr) {
+				mtxSync.unlock();
+				return DIERR_INVALIDPARAM;
+			}
+			LPDIRAMPFORCE rampForceParams = (LPDIRAMPFORCE)peff->lpvTypeSpecificParams;
+			mtxSync.unlock();
+			return ERROR_NOT_SUPPORTED;
+		} else if (fxType == DIEFT_PERIODIC && specificParamsSize == sizeof(DIPERIODIC)) {
+			LPDIPERIODIC periodicForceParams = (LPDIPERIODIC)peff->lpvTypeSpecificParams;
+			if (peff->lpEnvelope != nullptr) {
+				if (sizeof(*peff->lpEnvelope) != sizeof(DIENVELOPE)) {
+					mtxSync.unlock();
+					return DIERR_INVALIDPARAM;
+				}
+				envelope = peff->lpEnvelope;
+
+				magnitude = (max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX;
+				// dwAttackLevel: initial force (0-10k)
+				// dwAttackTime: time between initial force and IOffset (microsseconds)
+				// dwFadeLevel: force after effect ends (0-10k)
+				// dwFadeTime: time between lMagnitude and FadeLevel (microsseconds)
+				// IOffset will mark the midpoint force of the attack (baseline).
+				// dwMagnitude is the maximum difference between the current attack level and the actual force, each peak (+ and -)
+				//  attained every dwPeriod/2.
+				// Wonder how to represent this in a single puny vibration motor. :P
+			} else {
+				// Valid values are 0 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
+				magnitude = (max(0, min(DI_FFNOMINALMAX, periodicForceParams->dwMagnitude)) * 254) / DI_FFNOMINALMAX;
+			}
+
+			// After determining the behavior of dwMagnitude, save the initial phase (dwPhase), IOffset (reference/base force for the effect)
+			// IOffset will always be the baseline of the attack, or simply the center of the dwMagnitude oscillation
+			// dwPeriod, the time for a full cycle between IOffset+dwMagnitude > IOffset > IOffset-dwMagnitude > IOffset
+			// dwPhase being the initial position the oscillator would start at.
+			mtxSync.unlock();
+			return ERROR_NOT_SUPPORTED;
+		} else if (fxType == DIEFT_CUSTOMFORCE && specificParamsSize == sizeof(DICUSTOMFORCE)) {
+			if (peff->lpEnvelope != nullptr) {
+				mtxSync.unlock();
+				return DIERR_INVALIDPARAM;
+			}
+			LPDICUSTOMFORCE customForceParams = (LPDICUSTOMFORCE)peff->lpvTypeSpecificParams;
+			mtxSync.unlock();
+			return ERROR_NOT_SUPPORTED;
+		} else if (fxType == DIEFT_CONDITION && specificParamsSize == sizeof(DICONDITION)) {
+			if (peff->lpEnvelope != nullptr) {
+				mtxSync.unlock();
+				return DIERR_INVALIDPARAM;
+			}
+			LPDICONDITION conditionParamList = (LPDICONDITION)peff->lpvTypeSpecificParams;
+			mtxSync.unlock();
+			return ERROR_NOT_SUPPORTED;
+		} else {
+			mtxSync.unlock();
+			return ERROR_NOT_SUPPORTED;
 		}
 
 		if (peff->cAxes == 1) {
@@ -275,6 +353,8 @@ namespace vibration {
 
 		mtxSync.unlock();
 		StartVibrationThread(dwID);
+
+		return S_OK;
 	}
 
 	void VibrationController::StopEffect(DWORD dwEffectID, DWORD dwID)

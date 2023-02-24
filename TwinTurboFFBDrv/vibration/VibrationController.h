@@ -32,7 +32,7 @@ namespace vibration {
 
 	public:
 		static void SetHidDevicePath(LPWSTR path, DWORD dwID);
-		static void StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID);
+		static HRESULT StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID);
 		static void StopEffect(DWORD dwEffectID, DWORD dwID);
 		static void StopAllEffects(DWORD dwID);
 		static void Reset(DWORD dwID, std::thread* t = NULL);
