@@ -1,0 +1,3 @@
+*.vcxproj eol=crlf
+*.sln eol=crlf
+*.vdproj eol=crlf
