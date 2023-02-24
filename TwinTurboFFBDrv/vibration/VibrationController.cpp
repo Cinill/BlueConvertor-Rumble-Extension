@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <Hidsdi.h>
 
-#define DISABLE_INFINITE_VIBRATION
+#undef DISABLE_INFINITE_VIBRATION
 
 #define MAX_EFFECTS 5
 #define MAXC(a, b) ((a) > (b) ? (a) : (b))
@@ -143,7 +143,7 @@ namespace vibration {
 						}
 #ifdef DISABLE_INFINITE_VIBRATION
 						else {
-							VibEffects[k][dwID].dwStopFrame = frame + 1000;
+							VibEffects[k][dwID].dwStopFrame = frame + 10000;
 						}
 #endif
 
