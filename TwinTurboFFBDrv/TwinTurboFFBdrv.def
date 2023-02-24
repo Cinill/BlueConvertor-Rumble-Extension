@@ -1,7 +1,7 @@
-;genericFFBDriver.def : Declares the module parameters for the DLL.
+;twinTurboFFBdrv.def : Declares the module parameters for the DLL.
 
-;LIBRARY      genericFFBDriver
-;DESCRIPTION  'Generic USB Gamepad Vibration driver'
+;LIBRARY      twinTurboFFBdrv
+;DESCRIPTION  'Leadership Gamer Twin Turbo 1021 Steering Wheel'
 
 EXPORTS
 	DllRegisterServer	PRIVATE ; COM server registration

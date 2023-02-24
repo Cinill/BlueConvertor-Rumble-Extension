@@ -67,7 +67,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="genericFFBDriver.def">
+    <None Include="twinTurboFFBdrv.def">
       <Filter>Source Files</Filter>
     </None>
   </ItemGroup>
