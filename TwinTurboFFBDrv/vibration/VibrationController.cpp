@@ -281,7 +281,7 @@ namespace vibration {
 				}
 				envelope = peff->lpEnvelope;
 
-				magnitude = (max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX;
+				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX);
 				// dwAttackLevel: initial force (0-10k)
 				// dwAttackTime: time between initial force and lMagnitude (microsseconds)
 				// dwFadeLevel: force after effect ends (0-10k)
@@ -292,7 +292,7 @@ namespace vibration {
 #endif
 			} else {
 				// Valid values are -10,000 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
-				magnitude = (max(0, min(DI_FFNOMINALMAX, constantForceParams->lMagnitude)) * 254) / DI_FFNOMINALMAX; // FIXME
+				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, constantForceParams->lMagnitude)) * 254) / DI_FFNOMINALMAX); // FIXME
 #ifdef _DEBUG
 				LogMessage("Constant Force with magnitude specific parameter. magnitude:%lu, compressed to byte:%02X",
 					constantForceParams->lMagnitude, magnitude);
@@ -326,7 +326,7 @@ namespace vibration {
 				}
 				envelope = peff->lpEnvelope;
 
-				magnitude = (max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX;
+				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX);
 				// dwAttackLevel: initial force (0-10k)
 				// dwAttackTime: time between initial force and IOffset (microsseconds)
 				// dwFadeLevel: force after effect ends (0-10k)
@@ -341,7 +341,7 @@ namespace vibration {
 #endif
 			} else {
 				// Valid values are 0 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
-				magnitude = (max(0, min(DI_FFNOMINALMAX, periodicForceParams->dwMagnitude)) * 254) / DI_FFNOMINALMAX;
+				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, periodicForceParams->dwMagnitude)) * 254) / DI_FFNOMINALMAX);
 			}
 
 			// After determining the behavior of dwMagnitude, save the initial phase (dwPhase), IOffset (reference/base force for the effect)
