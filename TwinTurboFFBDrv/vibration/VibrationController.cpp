@@ -7,6 +7,10 @@
 #define MAX_EFFECTS 5
 #define MAXC(a, b) ((a) > (b) ? (a) : (b))
 
+#ifdef _DEBUG
+void LogMessage(const char* fmt, ...);
+#endif
+
 namespace vibration {
 	bool quitVibrationThread[2] = { false };
 
@@ -55,6 +59,41 @@ namespace vibration {
 
 	VibrationController::~VibrationController()
 	{
+	}
+
+	char* VibrationController::EffectNameFromID(DWORD fxId) {
+		char* effect_id_table[] = {
+			"Constant force (DIEFT_CONSTANTFORCE)",
+			"Ramp Force (DIEFT_RAMPFORCE)",
+			"Periodic Force (DIEFT_PERIODIC)",
+			"Conditional Force (DIEFT_CONDITION)",
+			"Custom Force (DIEFT_CUSTOMFORCE)",
+			"Unknown / Unsupported"
+		};
+		DWORD effect_type = DIEFT_GETTYPE(fxId);
+		char* fxName;
+
+		switch (effect_type) {
+		case DIEFT_CONSTANTFORCE:
+			fxName = effect_id_table[0];
+			break;
+		case DIEFT_RAMPFORCE:
+			fxName = effect_id_table[1];
+			break;
+		case DIEFT_PERIODIC:
+			fxName = effect_id_table[2];
+			break;
+		case DIEFT_CONDITION:
+			fxName = effect_id_table[3];
+			break;
+		case DIEFT_CUSTOMFORCE:
+			fxName = effect_id_table[4];
+			break;
+		default:
+			fxName = effect_id_table[5];
+		}
+
+		return fxName;
 	}
 
 	void VibrationController::StartVibrationThread(DWORD dwID)
@@ -117,6 +156,9 @@ namespace vibration {
 					if (VibEffects[k][dwID].dwStopFrame != INFINITE) {
 
 						if (VibEffects[k][dwID].dwStopFrame <= frame) {
+#ifdef _DEBUG
+							LogMessage("Wiping effect: slot:%i, dwId:0x%lx; Reached last frame.", k, dwID);
+#endif
 							VibEffects[k][dwID].isActive = FALSE;
 						}
 						else {
@@ -155,6 +197,9 @@ namespace vibration {
 			}
 
 			if (forceX != lastForceX || forceY != lastForceY) {
+#ifdef _DEBUG
+				LogMessage("Sending rumble command: dwId:0x%lx, forceX:%u, forcey:%u", dwID, forceX, forceY);
+#endif
 				// Send the command
 				if (forceX == 0 && forceY == 0)
 					SendVibrationStop(hHidDevice[dwID], dwID);
@@ -206,6 +251,10 @@ namespace vibration {
 				}
 			}
 		}
+#ifdef _DEBUG
+		LogMessage("Start Effect: slot=%i dwId=0x%lx effect=%s (typeId: %lu; flags:0x%04lx), duration:%lu",
+			idx, dwID, EffectNameFromID(dwEffectID), DIEFT_GETTYPE(dwEffectID), dwEffectID, peff->dwDuration);
+#endif
 
 		// Calculating intensity
 		byte forceX = 0x0;
@@ -223,6 +272,10 @@ namespace vibration {
 			LPDICONSTANTFORCE constantForceParams = (LPDICONSTANTFORCE)peff->lpvTypeSpecificParams;
 			if (peff->lpEnvelope != nullptr) {
 				if (sizeof(*peff->lpEnvelope) != sizeof(DIENVELOPE)) {
+#ifdef _DEBUG
+					LogMessage("Provided envelope to Constant Force effect does not match envelope size. Provided:%lu, DIENVELOPE:%lu",
+						sizeof(*peff->lpEnvelope), sizeof(DIENVELOPE));
+#endif
 					mtxSync.unlock();
 					return DIERR_INVALIDPARAM;
 				}
@@ -233,16 +286,35 @@ namespace vibration {
 				// dwAttackTime: time between initial force and lMagnitude (microsseconds)
 				// dwFadeLevel: force after effect ends (0-10k)
 				// dwFadeTime: time between lMagnitude and FadeLevel (microsseconds)
+#ifdef _DEBUG
+				LogMessage("Ignored envelope for Constant Force. attackLevel:%lu, attackTime:%lu, fadeLevel:%lu, fadeTime:%lu, magnitude:%u",
+					envelope->dwAttackLevel, envelope->dwAttackTime, envelope->dwFadeLevel, envelope->dwFadeTime, magnitude);
+#endif
 			} else {
 				// Valid values are -10,000 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
 				magnitude = (max(0, min(DI_FFNOMINALMAX, constantForceParams->lMagnitude)) * 254) / DI_FFNOMINALMAX; // FIXME
+#ifdef _DEBUG
+				LogMessage("Constant Force with magnitude specific parameter. magnitude:%lu, compressed to byte:%02X",
+					constantForceParams->lMagnitude, magnitude);
+#endif
 			}
+#ifdef _DEBUG
+			LogMessage("Constant force effect handled. byteMagnitude:%u, diMagnitude:%lu",
+				 magnitude, constantForceParams->lMagnitude);
+#endif
 		} else if (fxType == DIEFT_RAMPFORCE && specificParamsSize == sizeof(DIRAMPFORCE)) {
 			if (peff->lpEnvelope != nullptr) {
+#ifdef _DEBUG
+				LogMessage("Ramp force can't take an envelope: envelope size:%lu",
+					sizeof(peff->lpEnvelope));
+#endif
 				mtxSync.unlock();
 				return DIERR_INVALIDPARAM;
 			}
 			LPDIRAMPFORCE rampForceParams = (LPDIRAMPFORCE)peff->lpvTypeSpecificParams;
+#ifdef _DEBUG
+			LogMessage("Ramp force effects not supported.");
+#endif
 			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_PERIODIC && specificParamsSize == sizeof(DIPERIODIC)) {
@@ -263,6 +335,10 @@ namespace vibration {
 				// dwMagnitude is the maximum difference between the current attack level and the actual force, each peak (+ and -)
 				//  attained every dwPeriod/2.
 				// Wonder how to represent this in a single puny vibration motor. :P
+#ifdef _DEBUG
+				LogMessage("Ignored envelope for Constant Force: attackLevel=%lu attackTime=%lu fadeLevel=%lu fadeTime:%lu, magnitude:%u",
+					envelope->dwAttackLevel, envelope->dwAttackTime, envelope->dwFadeLevel, envelope->dwFadeTime, magnitude);
+#endif
 			} else {
 				// Valid values are 0 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
 				magnitude = (max(0, min(DI_FFNOMINALMAX, periodicForceParams->dwMagnitude)) * 254) / DI_FFNOMINALMAX;
@@ -272,25 +348,48 @@ namespace vibration {
 			// IOffset will always be the baseline of the attack, or simply the center of the dwMagnitude oscillation
 			// dwPeriod, the time for a full cycle between IOffset+dwMagnitude > IOffset > IOffset-dwMagnitude > IOffset
 			// dwPhase being the initial position the oscillator would start at.
+#ifdef _DEBUG
+			LogMessage("Periodic effects not supported. magnitude:%lu", periodicForceParams->dwMagnitude);
+#endif
 			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_CUSTOMFORCE && specificParamsSize == sizeof(DICUSTOMFORCE)) {
 			if (peff->lpEnvelope != nullptr) {
+#ifdef _DEBUG
+				LogMessage("Custom force can't take an envelope. envelope size:%lu",
+					sizeof(peff->lpEnvelope));
+#endif
 				mtxSync.unlock();
 				return DIERR_INVALIDPARAM;
 			}
 			LPDICUSTOMFORCE customForceParams = (LPDICUSTOMFORCE)peff->lpvTypeSpecificParams;
+#ifdef _DEBUG
+			LogMessage("Custom force effects not supported.");
+#endif
 			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_CONDITION && specificParamsSize == sizeof(DICONDITION)) {
 			if (peff->lpEnvelope != nullptr) {
+#ifdef _DEBUG
+				LogMessage("Condition can't take an envelope. envelope size:%lu",
+					sizeof(peff->lpEnvelope));
+#endif
 				mtxSync.unlock();
 				return DIERR_INVALIDPARAM;
 			}
 			LPDICONDITION conditionParamList = (LPDICONDITION)peff->lpvTypeSpecificParams;
+#ifdef _DEBUG
+			LogMessage("Condition effects not supported.");
+#endif
 			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else {
+#ifdef _DEBUG
+			LogMessage("Specific parameters size doesn't match any supported structure. size:%lu",
+				specificParamsSize);
+			LogMessage("Known parameter sizes: DICONSTANTFORCE:%lu, DIRAMPFORCE:%lu, DIPERIODIC:%lu, DICUSTOMFORCE:%lu, DICONDITION:%lu",
+				sizeof(DICONSTANTFORCE), sizeof(DIRAMPFORCE), sizeof(DIPERIODIC), sizeof(DICUSTOMFORCE), sizeof(DICONDITION));
+#endif
 			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		}
@@ -313,7 +412,9 @@ namespace vibration {
 				//forceY = lastForceY = (byte)(round((((double)peff->dwGain) / 10000.0) * 254.0));
 				forceY = lastForceY = magnitude;
 			}
-
+#ifdef _DEBUG
+			LogMessage("One-axis-effect. direction:%l, forceX:%u, forceY:%u", direction, forceX, forceY);
+#endif
 		}
 		else {
 			if (peff->cAxes >= 1) {
@@ -335,10 +436,20 @@ namespace vibration {
 				else
 					forceY = 0;
 			}
+#ifdef _DEBUG
+			if (peff->cAxes > 2)
+				LogMessage("Multi-axes-effect. Only axes 1 and 2 considered. Axis count:%lu, forceX:%u, forceY:%u", peff->cAxes, forceX, forceY);
+			else
+				LogMessage("Two-axes-effect. forceX:%u, forceY:%u", forceX, forceY);
+#endif
 		}
 
 
 		DWORD frame = GetTickCount();
+
+#ifdef _DEBUG
+		LogMessage("Effect has been queued for execution.");
+#endif
 
 		VibEffects[idx][dwID].forceX = forceX;
 		VibEffects[idx][dwID].forceY = forceY;
@@ -359,6 +470,10 @@ namespace vibration {
 
 	void VibrationController::StopEffect(DWORD dwEffectID, DWORD dwID)
 	{
+#if _DEBUG
+		LogMessage("Effect stop requested for dwEffectID:%lu (%s, %u), dwID:%lu",
+			dwEffectID, EffectNameFromID(dwEffectID), DIEFT_GETTYPE(dwEffectID), dwID);
+#endif
 		mtxSync.lock();
 		for (int k = 0; k < MAX_EFFECTS; k++) {
 			if (VibEffects[k][dwID].dwEffectId != dwEffectID)
@@ -372,6 +487,9 @@ namespace vibration {
 
 	void VibrationController::StopAllEffects(DWORD dwID)
 	{
+#if _DEBUG
+		LogMessage("Stop all effects requested for dwID:%lu", dwID);
+#endif
 		mtxSync.lock();
 		for (int k = 0; k < MAX_EFFECTS; k++) {
 			VibEffects[k][dwID].dwStopFrame = 0;
@@ -385,6 +503,9 @@ namespace vibration {
 	{	
 		if (t == NULL)
 		{		
+#if _DEBUG
+			LogMessage("Thread reset requested for dwID:%lu, all threads", dwID);
+#endif
 			if (thrVibration[dwID] == NULL)
 				return;
 
@@ -402,6 +523,10 @@ namespace vibration {
 			}
 		}
 		else {
+#if _DEBUG
+			LogMessage("Thread reset requested for dwID:%lu, thread#:%u",
+				dwID, t->get_id());
+#endif
 			DWORD ldwID = ThreadRef[t->get_id()];
 			
 			if (thrVibration[ldwID] == NULL)

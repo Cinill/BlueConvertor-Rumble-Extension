@@ -23,7 +23,7 @@ namespace vibration {
 		static std::vector<std::wstring> hidDevPath;
 		static std::mutex mtxSync;
 		static std::unique_ptr<std::thread, VibrationThreadDeleter> thrVibration[2];
-		
+
 		VibrationController();
 		~VibrationController();
 
@@ -36,6 +36,7 @@ namespace vibration {
 		static void StopEffect(DWORD dwEffectID, DWORD dwID);
 		static void StopAllEffects(DWORD dwID);
 		static void Reset(DWORD dwID, std::thread* t = NULL);
+		static char* EffectNameFromID(DWORD fxId);
 	};
 
 }
