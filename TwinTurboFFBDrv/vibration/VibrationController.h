@@ -35,6 +35,8 @@ namespace vibration {
 		static HRESULT StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID);
 		static void StopEffect(DWORD dwEffectID, DWORD dwID);
 		static void StopAllEffects(DWORD dwID);
+		static void Pause(DWORD dwID);
+		static void Resume(DWORD dwID);
 		static void Reset(DWORD dwID, std::thread* t = NULL);
 		static char* EffectNameFromID(DWORD fxId);
 	};

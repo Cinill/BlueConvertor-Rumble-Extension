@@ -13,6 +13,8 @@ void LogMessage(const char* fmt, ...);
 
 namespace vibration {
 	bool quitVibrationThread[2] = { false };
+	bool paused[2] = { false };
+	DWORD paused_at_frame[2] = { 0x00 };
 
 	void SendHidCommand(HANDLE hHidDevice, const byte* buff, DWORD buffsz) {
 		HidD_SetOutputReport(hHidDevice, (PVOID)buff, 5);
@@ -141,6 +143,10 @@ namespace vibration {
 			if (quitVibrationThread[dwID]) {
 				mtxSync.unlock();
 				break;
+			} else if (paused[dwID]) {
+				mtxSync.unlock();
+				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				continue;
 			}
 
 			DWORD frame = GetTickCount();
@@ -497,6 +503,59 @@ namespace vibration {
 		mtxSync.unlock();
 
 		Reset(dwID);
+	}
+
+	void VibrationController::Pause(DWORD dwID)
+	{
+		if (!paused[dwID]) {
+			paused_at_frame[dwID] = GetTickCount();
+			paused[dwID] = true;
+#if _DEBUG
+			LogMessage("Pause all effects requested for dwID:%lu. Reference frame: %lu", dwID, paused_at_frame[dwID]);
+#endif
+		} else {
+			// If we re-pause and refresh the current frame, we would lose a reliable reference to update
+			// frame count left for running effects when we resume execution.
+#if _DEBUG
+			LogMessage("Pause all effects re-requested for dwID:%lu (already paused). Reference frame: %lu", dwID, paused_at_frame[dwID]);
+#endif
+		}
+	}
+
+	void VibrationController::Resume(DWORD dwID)
+	{
+		VibrationEff fx;
+		DWORD frame, deltaf;
+
+		if (paused[dwID]) {
+			frame = GetTickCount();
+			deltaf = frame - paused_at_frame[dwID];
+#if _DEBUG
+			LogMessage("Resuming effects for dwID:%lu. Was paused at frame %lu. Paused for %lu frames.",
+				dwID, paused_at_frame[dwID], deltaf);
+#endif
+
+			mtxSync.lock();
+			for (int k = 0; k < MAX_EFFECTS; k++) {
+				fx = VibEffects[k][dwID];
+				if (fx.dwStopFrame != INFINITE && fx.dwStopFrame < paused_at_frame[dwID]) {
+#ifdef _DEBUG
+					LogMessage("Effect in slot #%i: forwarding stop frame from %lu to %lu.",
+						k, fx.dwStopFrame, fx.dwStopFrame + deltaf);
+#endif
+					fx.dwStopFrame = fx.dwStopFrame + deltaf;
+#ifdef _DEBUG
+				} else {
+					LogMessage("Effect in slot #%i: %s", fx.dwStopFrame == INFINITE ? "is infinite" : "already reached last frame before pause");
+#endif
+				}
+			}
+			mtxSync.unlock();
+#if _DEBUG
+		} else {
+			LogMessage("Effects for dwID:%lu are not paused. Can't resume non-paused effects.", dwID);
+#endif
+		}
 	}
 
 	void VibrationController::Reset(DWORD dwID, std::thread* t)

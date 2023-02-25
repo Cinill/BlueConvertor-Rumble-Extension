@@ -139,7 +139,13 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
 		break;
 
 	case DISFFC_PAUSE:
+		vibration::VibrationController::Pause(dwID);
+		break;
+
 	case DISFFC_CONTINUE:
+		vibration::VibrationController::Resume(dwID);
+		break;
+
 	case DISFFC_SETACTUATORSON:
 	case DISFFC_SETACTUATORSOFF:
 		break;
