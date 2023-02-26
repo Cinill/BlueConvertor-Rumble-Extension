@@ -127,6 +127,13 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
 #ifdef _DEBUG
 	LogMessage("SendForceFeedbackCommand\n\tdwID=0x%04x\n\tdwCommand=0x%04x",
 		dwID, dwCommand);
+	LogMessage("Command match table:\n"
+		" [%c] Reset                [%c] Stop All Effects      [%c] Pause\n"
+		" [%c] Continue (resume)    [%c] Set Actuators on      [%c] Set Actuators off",
+#define yn(cmd) dwCommand & cmd ? 'x' : ' '
+		yn(DISFFC_RESET), yn(DISFFC_STOPALL), yn(DISFFC_PAUSE),
+		yn(DISFFC_CONTINUE), yn(DISFFC_SETACTUATORSON), yn(DISFFC_SETACTUATORSOFF));
+#undef yn
 #endif
 
 	switch (dwCommand) {
@@ -169,18 +176,18 @@ HRESULT STDMETHODCALLTYPE FFBDriver::DownloadEffect(
 	DWORD       dwFlags) 
 {
 #ifdef _DEBUG
-#define yn(mask) dwFlags & mask ? 'x' : ' '
-
 	LogMessage("DownloadEffect: dwID:0x%04x, dwEffectID:0x%04x, dwFlags:0x%04x, peff->dwDuration:%4lu, gain:%4lu",
 		dwID, dwEffectID, dwFlags, peff->dwDuration, peff->dwGain);
-	LogMessage("Modification flags (dwFlags):\n "
-		"[%c] duration             [%c] sample period         [%c] gain\n "
-		"[%c] trigger button       [%c] trig.btn.repeat intvl [%c] axes\n "
-		"[%c] direction            [%c] envelope              [%c] type-specific params\n "
-		"[%c] force restart        [%c] deny restart          [%c] don't download",
+	LogMessage("Modification flags (dwFlags):\n"
+		" [%c] duration             [%c] sample period         [%c] gain\n"
+		" [%c] trigger button       [%c] trig.btn.repeat intvl [%c] axes\n"
+		" [%c] direction            [%c] envelope              [%c] type-specific params\n"
+		" [%c] force restart        [%c] deny restart          [%c] don't download",
+#define yn(mask) dwFlags & mask ? 'x' : ' '
 		yn(DIEP_DURATION), yn(DIEP_SAMPLEPERIOD), yn(DIEP_GAIN), yn(DIEP_TRIGGERBUTTON), yn(DIEP_TRIGGERREPEATINTERVAL),
 		yn(DIEP_AXES), yn(DIEP_DIRECTION), yn(DIEP_ENVELOPE), yn(DIEP_TYPESPECIFICPARAMS), yn(DIEP_START),
 		yn(DIEP_NORESTART), yn(DIEP_NODOWNLOAD));
+#undef yn
 #endif
 
 	return vibration::VibrationController::StartEffect(dwEffectID, peff, dwID);
