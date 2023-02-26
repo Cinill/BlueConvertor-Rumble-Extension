@@ -1,4 +1,5 @@
 #include "VibrationController.h"
+#include "dieffectattributes.h"
 #include <algorithm>
 #include <Hidsdi.h>
 
@@ -96,6 +97,101 @@ namespace vibration {
 		}
 
 		return fxName;
+	}
+
+	char* effectNameFromDeviceID(DWORD dwEffectId) {
+		char* fxName;
+
+		switch (dwEffectId) {
+		case CEID_ConstantForce:
+			fxName = "Constant Force";
+			break;
+        case CEID_RampForce   :
+			fxName = "Ramp Force";
+			break;
+		case CEID_Square      :
+			fxName = "Square";
+			break;
+		case CEID_Sine        :
+			fxName = "Sine";
+			break;
+		case CEID_Triangle    :
+			fxName = "Triangle";
+			break;
+		case CEID_SawtoothUp  :
+			fxName = "Sawtooth Up";
+			break;
+		case CEID_SawtoothDown:
+			fxName = "Swtooth Down";
+			break;
+		case CEID_Spring      :
+			fxName = "Spring";
+			break;
+		case CEID_Damper      :
+			fxName = "Damper";
+			break;
+		case CEID_Inertia     :
+			fxName = "Inertia";
+			break;
+		case CEID_Friction    :
+			fxName = "Friction";
+			break;
+		case CEID_CustomForce :
+			fxName = "Custom Force";
+			break;
+		default:
+			fxName = "<invalid>";
+		}
+
+		return fxName;
+	}
+
+	DWORD fxFlagsFromEffectId(DWORD dwEffectId) {
+		switch (dwEffectId) {
+		case CEID_ConstantForce:
+			return CETYPE_ConstantForce;
+		case CEID_RampForce:
+			return CETYPE_RampForce;
+		case CEID_Square:
+			return CETYPE_Square;
+		case CEID_Sine:
+			return CETYPE_Sine;
+		case CEID_Triangle:
+			return CETYPE_Triangle;
+		case CEID_SawtoothUp:
+			return CETYPE_SawtoothUp;
+		case CEID_SawtoothDown:
+			return CETYPE_SawtoothDown;
+		case CEID_Spring:
+			return CETYPE_Spring;
+		case CEID_Damper:
+			return CETYPE_Damper;
+		case CEID_Inertia:
+			return CETYPE_Inertia;
+		case CEID_Friction:
+			return CETYPE_Friction;
+		case CEID_CustomForce:
+			return CETYPE_CustomForce;
+		default:
+			return 0x0;
+		}
+	}
+
+	DWORD fxCapabsFromEffectType(DWORD fxType) {
+		switch (fxType) {
+		case DIEFT_CONSTANTFORCE:
+			return CESP_ConstantForce;
+		case DIEFT_RAMPFORCE:
+			return CESP_RampForce;
+		case DIEFT_PERIODIC:
+			return CESP_Periodic;
+		case DIEFT_CONDITION:
+			return CESP_Conditional;
+		case DIEFT_CUSTOMFORCE:
+			return CESP_CustomForce;
+		default:
+			return 0x0;
+		}
 	}
 
 	void VibrationController::StartVibrationThread(DWORD dwID)
@@ -233,12 +329,7 @@ namespace vibration {
 		Reset(dwID);
 	}
 
-	HRESULT VibrationController::StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID)
-	{
-		LPDIENVELOPE envelope;
-
-		mtxSync.lock();
-
+	size_t getEffectSlot(DWORD dwID, DWORD dwEffectID) {
 		int idx = -1;
 		// Reusing the same idx if effect was already created
 		for (int k = 0; k < MAX_EFFECTS; k++) {
@@ -257,9 +348,63 @@ namespace vibration {
 				}
 			}
 		}
+
+		return idx;
+	}
+
+	HRESULT VibrationController::StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID)
+	{
+		LPDIENVELOPE envelope;
+
+		mtxSync.lock();
+
+		int idx = getEffectSlot(dwID, dwEffectID);
+		DWORD fxDeviceFlags = fxFlagsFromEffectId(dwEffectID);
+		byte fxType = DIEFT_GETTYPE(fxDeviceFlags);
+		DWORD fxCapabs = fxCapabsFromEffectType(fxType);
+
+		if (fxDeviceFlags == 0x00) {
 #ifdef _DEBUG
-		LogMessage("Start Effect: slot=%i dwId=0x%lx effect=%s (typeId: %lu; flags:0x%04lx), duration:%lu",
-			idx, dwID, EffectNameFromID(dwEffectID), DIEFT_GETTYPE(dwEffectID), dwEffectID, peff->dwDuration);
+			LogMessage("Start effect: no effect with the provided id exists. device: %lu, effect: %s (%s, id:0x%04lx)",
+				dwID, effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), dwEffectID);
+#endif
+			mtxSync.unlock();
+			return DIERR_INCOMPLETEEFFECT;
+		}
+
+		if (idx < 0) {
+#ifdef _DEBUG
+			LogMessage("Start Effect: no free slots found to allocate effect. device: %lu, effect: %s (%s, id:0x%04lx), flags: %04lx",
+				dwID, effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), dwEffectID, fxDeviceFlags);
+#endif
+			mtxSync.unlock();
+			return DIERR_DEVICEFULL;
+		}
+
+#ifdef _DEBUG
+		LogMessage("Start Effect: slot=%i dwId=0x%lx duration:%lu",
+			idx, dwID, peff->dwDuration);
+
+		LogMessage("Effect information: %s (%s, flags: 0x%04lx)\n"
+			" [%c] Hardware Effect      [%c] Force Feedback Attack [%c] Force Feedback Fade\n"
+			" [%c] Saturation           [%c] Pos/neg Coefficients  [%c] Pos/neg Saturation",
+			effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), fxDeviceFlags,
+#define fxf(mask) fxDeviceFlags & mask ? 'x' : ' '
+			fxf(DIEFT_HARDWARE), fxf(DIEFT_FFATTACK), fxf(DIEFT_FFFADE),
+			fxf(DIEFT_SATURATION), fxf(DIEFT_POSNEGCOEFFICIENTS), fxf(DIEFT_POSNEGSATURATION));
+#undef fxf
+		LogMessage("Effect support table (flags: 0x%04lx):\n"
+			" [%c] duration             [%c] sample period         [%c] gain\n"
+			" [%c] trigger button       [%c] trig.btn.repeat intvl [%c] axes\n"
+			" [%c] direction            [%c] envelope              [%c] type-specific params\n"
+			" [%c] force restart        [%c] deny restart          [%c] don't download",
+			fxCapabs,
+#define fxc(mask) fxCapabs & mask ? 'x' : ' '
+			fxc(DIEP_DURATION), fxc(DIEP_SAMPLEPERIOD), fxc(DIEP_GAIN),
+			fxc(DIEP_TRIGGERBUTTON), fxc(DIEP_TRIGGERREPEATINTERVAL), fxc(DIEP_AXES),
+			fxc(DIEP_DIRECTION), fxc(DIEP_ENVELOPE), fxc(DIEP_TYPESPECIFICPARAMS),
+			fxc(DIEP_START), fxc(DIEP_NORESTART), fxc(DIEP_NODOWNLOAD));
+#undef fxc
 #endif
 
 		// Calculating intensity
@@ -269,8 +414,6 @@ namespace vibration {
 		byte magnitude = 0x0;
 
 		DWORD specificParamsSize = peff->cbTypeSpecificParams;
-
-		byte fxType = DIEFT_GETTYPE(dwEffectID);
 
 		if (specificParamsSize == 0) {
 			// No specific effects. Go on.
@@ -400,65 +543,10 @@ namespace vibration {
 			return ERROR_NOT_SUPPORTED;
 		}
 
-		if (peff->cAxes == 1) {
-			// If direction is negative, then it is a forceX
-			// Otherwise it is a forceY
-			LONG direction = peff->rglDirection[0];
-			static byte lastForceX = 0;
-			static byte lastForceY = 0;
-
-			forceX = lastForceX;
-			forceY = lastForceY;
-
-			if (direction == -1) {
-				//forceX = lastForceX = (byte)(round((((double)peff->dwGain) / 10000.0) * 254.0));
-				forceX = lastForceX = magnitude;
-			}
-			else if (direction == 1) {
-				//forceY = lastForceY = (byte)(round((((double)peff->dwGain) / 10000.0) * 254.0));
-				forceY = lastForceY = magnitude;
-			}
-#ifdef _DEBUG
-			LogMessage("One-axis-effect. direction:%l, forceX:%u, forceY:%u", direction, forceX, forceY);
-#endif
-		}
-		else {
-			if (peff->cAxes >= 1) {
-				LONG fx = peff->rglDirection[0];
-				//if (fx <= 1) fx = peff->dwGain;
-
-				if (fx > 0)
-					forceX = forceY = magnitude;
-				else
-					forceX = forceY = 0;
-			}
-
-			if (peff->cAxes >= 2) {
-				LONG fy = peff->rglDirection[1];
-				//if (fy <= 1) fy = peff->dwGain;
-
-				if (fy > 0)
-					forceY = magnitude;
-				else
-					forceY = 0;
-			}
-#ifdef _DEBUG
-			if (peff->cAxes > 2)
-				LogMessage("Multi-axes-effect. Only axes 1 and 2 considered. Axis count:%lu, forceX:%u, forceY:%u", peff->cAxes, forceX, forceY);
-			else
-				LogMessage("Two-axes-effect. forceX:%u, forceY:%u", forceX, forceY);
-#endif
-		}
-
-
 		DWORD frame = GetTickCount();
 
-#ifdef _DEBUG
-		LogMessage("Effect has been queued for execution.");
-#endif
-
-		VibEffects[idx][dwID].forceX = forceX;
-		VibEffects[idx][dwID].forceY = forceY;
+		VibEffects[idx][dwID].forceX = magnitude;
+		VibEffects[idx][dwID].forceY = 0;
 
 		VibEffects[idx][dwID].dwEffectId = dwEffectID;
 		VibEffects[idx][dwID].dwStartFrame = frame + (peff->dwStartDelay / 1000);
@@ -469,6 +557,9 @@ namespace vibration {
 		VibEffects[idx][dwID].started = FALSE;
 
 		mtxSync.unlock();
+#ifdef _DEBUG
+		LogMessage("Effect has been queued for execution.");
+#endif
 		StartVibrationThread(dwID);
 
 		return S_OK;
