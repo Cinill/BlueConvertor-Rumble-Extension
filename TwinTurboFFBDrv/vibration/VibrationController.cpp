@@ -349,9 +349,6 @@ namespace vibration {
 	{
 		LPDIENVELOPE envelope;
 
-		mtxSync.lock();
-
-		int idx = getEffectSlot(dwID, dwEffectID);
 		DWORD fxDeviceFlags = fxFlagsFromEffectId(dwEffectID);
 		byte fxType = DIEFT_GETTYPE(fxDeviceFlags);
 		DWORD fxCapabs = fxCapabsFromEffectType(fxType);
@@ -361,22 +358,12 @@ namespace vibration {
 			LogMessage("Start effect: no effect with the provided id exists. device: %lu, effect: %s (%s, id:0x%04lx)",
 				dwID, effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), dwEffectID);
 #endif
-			mtxSync.unlock();
 			return DIERR_INCOMPLETEEFFECT;
 		}
 
-		if (idx < 0) {
 #ifdef _DEBUG
-			LogMessage("Start Effect: no free slots found to allocate effect. device: %lu, effect: %s (%s, id:0x%04lx), flags: %04lx",
-				dwID, effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), dwEffectID, fxDeviceFlags);
-#endif
-			mtxSync.unlock();
-			return DIERR_DEVICEFULL;
-		}
-
-#ifdef _DEBUG
-		LogMessage("Start Effect: slot=%i dwId=0x%lx duration:%lu",
-			idx, dwID, peff->dwDuration);
+		LogMessage("Start Effect: dwId=0x%lx duration:%lu",
+			dwID, peff->dwDuration);
 
 		LogMessage("Effect information: %s (%s, flags: 0x%04lx)\n"
 			" [%c] Hardware Effect      [%c] Force Feedback Attack [%c] Force Feedback Fade\n"
@@ -415,7 +402,6 @@ namespace vibration {
 					LogMessage("Provided envelope to Constant Force effect does not match envelope size. Provided:%lu, DIENVELOPE:%lu",
 						sizeof(*peff->lpEnvelope), sizeof(DIENVELOPE));
 #endif
-					mtxSync.unlock();
 					return DIERR_INVALIDPARAM;
 				}
 				envelope = peff->lpEnvelope;
@@ -447,20 +433,17 @@ namespace vibration {
 				LogMessage("Ramp force can't take an envelope: envelope size:%lu",
 					sizeof(peff->lpEnvelope));
 #endif
-				mtxSync.unlock();
 				return DIERR_INVALIDPARAM;
 			}
 			LPDIRAMPFORCE rampForceParams = (LPDIRAMPFORCE)peff->lpvTypeSpecificParams;
 #ifdef _DEBUG
 			LogMessage("Ramp force effects not supported.");
 #endif
-			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_PERIODIC && specificParamsSize == sizeof(DIPERIODIC)) {
 			LPDIPERIODIC periodicForceParams = (LPDIPERIODIC)peff->lpvTypeSpecificParams;
 			if (peff->lpEnvelope != nullptr) {
 				if (sizeof(*peff->lpEnvelope) != sizeof(DIENVELOPE)) {
-					mtxSync.unlock();
 					return DIERR_INVALIDPARAM;
 				}
 				envelope = peff->lpEnvelope;
@@ -490,7 +473,6 @@ namespace vibration {
 #ifdef _DEBUG
 			LogMessage("Periodic effects not supported. magnitude:%lu", periodicForceParams->dwMagnitude);
 #endif
-			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_CUSTOMFORCE && specificParamsSize == sizeof(DICUSTOMFORCE)) {
 			if (peff->lpEnvelope != nullptr) {
@@ -498,14 +480,12 @@ namespace vibration {
 				LogMessage("Custom force can't take an envelope. envelope size:%lu",
 					sizeof(peff->lpEnvelope));
 #endif
-				mtxSync.unlock();
 				return DIERR_INVALIDPARAM;
 			}
 			LPDICUSTOMFORCE customForceParams = (LPDICUSTOMFORCE)peff->lpvTypeSpecificParams;
 #ifdef _DEBUG
 			LogMessage("Custom force effects not supported.");
 #endif
-			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_CONDITION && specificParamsSize == sizeof(DICONDITION)) {
 			if (peff->lpEnvelope != nullptr) {
@@ -513,14 +493,12 @@ namespace vibration {
 				LogMessage("Condition can't take an envelope. envelope size:%lu",
 					sizeof(peff->lpEnvelope));
 #endif
-				mtxSync.unlock();
 				return DIERR_INVALIDPARAM;
 			}
 			LPDICONDITION conditionParamList = (LPDICONDITION)peff->lpvTypeSpecificParams;
 #ifdef _DEBUG
 			LogMessage("Condition effects not supported.");
 #endif
-			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		} else {
 #ifdef _DEBUG
@@ -529,11 +507,21 @@ namespace vibration {
 			LogMessage("Known parameter sizes: DICONSTANTFORCE:%lu, DIRAMPFORCE:%lu, DIPERIODIC:%lu, DICUSTOMFORCE:%lu, DICONDITION:%lu",
 				sizeof(DICONSTANTFORCE), sizeof(DIRAMPFORCE), sizeof(DIPERIODIC), sizeof(DICUSTOMFORCE), sizeof(DICONDITION));
 #endif
-			mtxSync.unlock();
 			return ERROR_NOT_SUPPORTED;
 		}
 
 		DWORD now = GetTickCount();
+
+		mtxSync.lock();
+		int idx = getEffectSlot(dwID, dwEffectID);
+		if (idx < 0) {
+#ifdef _DEBUG
+			LogMessage("Start Effect: no free slots found to allocate effect. device: %lu, effect: %s (%s, id:0x%04lx), flags: %04lx",
+				dwID, effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), dwEffectID, fxDeviceFlags);
+#endif
+			mtxSync.unlock();
+			return DIERR_DEVICEFULL;
+		}
 
 		VibrationEff *fx = &VibEffects[idx][dwID];
 		if (magnitude == 0) {
@@ -541,7 +529,7 @@ namespace vibration {
 				if (fx->started) {
 					// Effect is running, just set it to stop then.
 #ifdef _DEBUG
-					LogMessage("Zero magnitude strength to effect executing. Setting its time to stop as \"now\".");
+					LogMessage("Stopping active effect: Zero magnitude strength provided.");
 #endif
 					fx->dwStopFrame = now;
 				}
@@ -549,7 +537,7 @@ namespace vibration {
 					// Effect had a strength but didn't have a chance to start before it received zero-strength.
 					// Effect slot will become available.
 #ifdef _DEBUG
-					LogMessage("Zero magnitude strength to effect not yet started. Deactivating it.");
+					LogMessage("Set effect not to start: Zero magnitude strength provided.");
 #endif
 					fx->isActive = false;
 				}
@@ -566,9 +554,9 @@ namespace vibration {
 			// mgn - x
 			// x = 100 * mgn / 254
 			if (peff->dwDuration == INFINITE)
-				LogMessage("Applying effect. Strength: %.2f%%, stop: never", (magnitude * 100.0f) / 254.0f);
+				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: never", idx, (magnitude * 100.0f) / 254.0f);
 			else
-				LogMessage("Applying effect. Strength: %.2f%%, stop: %lu", (magnitude * 100.0f) / 254.0f, peff->dwDuration);
+				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: %lu", idx, (magnitude * 100.0f) / 254.0f, peff->dwDuration);
 #endif
 			fx->strength = magnitude;
 			fx->dwEffectId = dwEffectID;
