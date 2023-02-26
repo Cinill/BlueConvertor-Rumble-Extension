@@ -362,9 +362,10 @@ namespace vibration {
 		}
 
 #ifdef _DEBUG
-		LogMessage("Start Effect: dwId=0x%lx duration:%lu",
-			dwID, peff->dwDuration);
-
+		LogMessage("Start Effect: %s (%s, flags: 0x%04lx), dwId=0x%lx, duration:%lums",
+			effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), fxDeviceFlags,
+			dwID, peff->dwDuration / 1000);
+		/* This is only useful while building dieffectattributes.h
 		LogMessage("Effect information: %s (%s, flags: 0x%04lx)\n"
 			" [%c] Hardware Effect      [%c] Force Feedback Attack [%c] Force Feedback Fade\n"
 			" [%c] Saturation           [%c] Pos/neg Coefficients  [%c] Pos/neg Saturation",
@@ -384,11 +385,18 @@ namespace vibration {
 			fxc(DIEP_TRIGGERBUTTON), fxc(DIEP_TRIGGERREPEATINTERVAL), fxc(DIEP_AXES),
 			fxc(DIEP_DIRECTION), fxc(DIEP_ENVELOPE), fxc(DIEP_TYPESPECIFICPARAMS),
 			fxc(DIEP_START), fxc(DIEP_NORESTART), fxc(DIEP_NODOWNLOAD));
-#undef fxc
+#undef fxc */
+		LogMessage("Effect flags (0x%04lx):\n"
+			" Object referenced: (%c) By IDs     (%c) By Offset\n"
+			" Coordinate system: (%c) Cartesian  (%c) Polar      (%c) Spherical",
+			peff->dwFlags,
+#define fxe(mask) peff->dwFlags & mask ? 'o' : ' '
+			fxe(DIEFF_OBJECTIDS), fxe(DIEFF_OBJECTOFFSETS),
+			fxe(DIEFF_CARTESIAN), fxe(DIEFF_POLAR), fxe(DIEFF_SPHERICAL));
 #endif
 
 		// Calculating intensity
-		byte magnitude = 0x0;
+		DWORD magnitude = 0x0;
 
 		DWORD specificParamsSize = peff->cbTypeSpecificParams;
 
@@ -406,7 +414,7 @@ namespace vibration {
 				}
 				envelope = peff->lpEnvelope;
 
-				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX);
+				magnitude = max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel));
 				// dwAttackLevel: initial force (0-10k)
 				// dwAttackTime: time between initial force and lMagnitude (microsseconds)
 				// dwFadeLevel: force after effect ends (0-10k)
@@ -416,10 +424,11 @@ namespace vibration {
 					envelope->dwAttackLevel, envelope->dwAttackTime, envelope->dwFadeLevel, envelope->dwFadeTime, magnitude);
 #endif
 			} else {
-				// Valid values are -10,000 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
-				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, constantForceParams->lMagnitude)) * 254) / DI_FFNOMINALMAX); // FIXME
+				// Valid values are -10,000 .. 10,000 (DI_FFNOMINALMAX)
+				if (constantForceParams->lMagnitude < 0) constantForceParams->lMagnitude = constantForceParams->lMagnitude * (-1);
+				magnitude = max(0, min(DI_FFNOMINALMAX, constantForceParams->lMagnitude));
 #ifdef _DEBUG
-				LogMessage("Constant Force with magnitude specific parameter. magnitude:%lu, compressed to byte:%02X",
+				LogMessage("Constant Force with magnitude specific parameter. magnitude: %lu, compressed to 0-10k: %02X",
 					constantForceParams->lMagnitude, magnitude);
 #endif
 			}
@@ -448,7 +457,7 @@ namespace vibration {
 				}
 				envelope = peff->lpEnvelope;
 
-				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel)) * 254) / DI_FFNOMINALMAX);
+				magnitude = max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel));
 				// dwAttackLevel: initial force (0-10k)
 				// dwAttackTime: time between initial force and IOffset (microsseconds)
 				// dwFadeLevel: force after effect ends (0-10k)
@@ -463,7 +472,7 @@ namespace vibration {
 #endif
 			} else {
 				// Valid values are 0 .. 10,000 (DI_FFNOMINALMAX), translated into 0 .. 254
-				magnitude = static_cast<byte>((max(0, min(DI_FFNOMINALMAX, periodicForceParams->dwMagnitude)) * 254) / DI_FFNOMINALMAX);
+				magnitude = max(0, min(DI_FFNOMINALMAX, periodicForceParams->dwMagnitude));
 			}
 
 			// After determining the behavior of dwMagnitude, save the initial phase (dwPhase), IOffset (reference/base force for the effect)
@@ -512,6 +521,17 @@ namespace vibration {
 
 		DWORD now = GetTickCount();
 
+		byte str = 0;
+		if (magnitude != 0 && peff->dwGain > 0) {
+			if (peff->dwGain != 10000) {
+				magnitude *= max(0, min(DI_FFNOMINALMAX, peff->dwGain)) / 10000.0f;
+			}
+
+			// DI_FFNOMINALMAX - 254 => str = (magnitude * 254) / DI_FFNOMINALMAX
+			//       magnitude - str
+			str = magnitude * (254.0f / DI_FFNOMINALMAX); // group by the constants for optimization
+		}
+
 		mtxSync.lock();
 		int idx = getEffectSlot(dwID, dwEffectID);
 		if (idx < 0) {
@@ -524,7 +544,7 @@ namespace vibration {
 		}
 
 		VibrationEff *fx = &VibEffects[idx][dwID];
-		if (magnitude == 0) {
+		if (str == 0) {
 			if (fx->isActive) {
 				if (fx->started) {
 					// Effect is running, just set it to stop then.
@@ -554,11 +574,11 @@ namespace vibration {
 			// mgn - x
 			// x = 100 * mgn / 254
 			if (peff->dwDuration == INFINITE)
-				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: never", idx, (magnitude * 100.0f) / 254.0f);
+				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: never", idx, (str * 100.0f) / 254.0f);
 			else
-				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: %lu", idx, (magnitude * 100.0f) / 254.0f, peff->dwDuration);
+				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: %lu", idx, (str * 100.0f) / 254.0f, peff->dwDuration);
 #endif
-			fx->strength = magnitude;
+			fx->strength = str;
 			fx->dwEffectId = dwEffectID;
 			fx->dwStartFrame = now + (peff->dwStartDelay / 1000);
 			fx->dwStopFrame =
