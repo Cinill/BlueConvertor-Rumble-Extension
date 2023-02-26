@@ -117,7 +117,7 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SetGain(
 		currentGain = (byte)newGain;
 	*/
 
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }
 
 HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
@@ -142,7 +142,7 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
 		break;
 
 	case DISFFC_STOPALL:
-		vibration::VibrationController::StopAllEffects(dwID);
+		vibration::VibrationController::DequeueAllEffects(dwID);
 		break;
 
 	case DISFFC_PAUSE:
@@ -165,19 +165,19 @@ HRESULT STDMETHODCALLTYPE FFBDriver::GetForceFeedbackState(THIS_ DWORD, LPDIDEVI
 #ifdef _DEBUG
 	LogMessage("GetForceFeedbackState!");
 #endif
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }
 
 HRESULT STDMETHODCALLTYPE FFBDriver::DownloadEffect(
-	DWORD       dwID,
-	DWORD       dwEffectID,
-	LPDWORD     pdwEffect,
-	LPCDIEFFECT peff,
+	DWORD       dwDeviceID,
+	DWORD       dwInternalEffectType,
+	LPDWORD     lpdwDnloadID,
+	LPCDIEFFECT lpEffect,
 	DWORD       dwFlags) 
 {
 #ifdef _DEBUG
 	LogMessage("DownloadEffect: dwID:0x%04x, dwEffectID:0x%04x, dwFlags:0x%04x, peff->dwDuration:%4lu, gain:%4lu",
-		dwID, dwEffectID, dwFlags, peff->dwDuration, peff->dwGain);
+		dwDeviceID, dwInternalEffectType, dwFlags, lpEffect->dwDuration, lpEffect->dwGain);
 	LogMessage("Modification flags (dwFlags):\n"
 		" [%c] duration             [%c] sample period         [%c] gain\n"
 		" [%c] trigger button       [%c] trig.btn.repeat intvl [%c] axes\n"
@@ -190,30 +190,30 @@ HRESULT STDMETHODCALLTYPE FFBDriver::DownloadEffect(
 #undef yn
 #endif
 
-	return vibration::VibrationController::StartEffect(dwEffectID, peff, dwID);
+	return vibration::VibrationController::EnqueueEffect(dwDeviceID, dwInternalEffectType, lpdwDnloadID, lpEffect, dwFlags);
 }
 
 HRESULT STDMETHODCALLTYPE FFBDriver::DestroyEffect(DWORD, DWORD) {
 #ifdef _DEBUG
 	LogMessage("DestroyEffect!");
 #endif
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }
 HRESULT STDMETHODCALLTYPE FFBDriver::StartEffect(DWORD, DWORD, DWORD, DWORD) {
 #ifdef _DEBUG
 	LogMessage("StartEffect!");
 #endif
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }
 HRESULT STDMETHODCALLTYPE FFBDriver::StopEffect(DWORD dwID, DWORD dwEffect) {
 #ifdef _DEBUG
 	LogMessage("StopEffect!");
 #endif
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }
 HRESULT STDMETHODCALLTYPE FFBDriver::GetEffectStatus(DWORD, DWORD, LPDWORD) {
 #ifdef _DEBUG
 	LogMessage("GetEffectStatus!");
 #endif
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }

@@ -63,45 +63,42 @@ namespace vibration {
 	{
 	}
 
-	char* VibrationController::EffectNameFromID(DWORD fxId) {
-		char* effect_id_table[] = {
-			"Constant force (DIEFT_CONSTANTFORCE)",
-			"Ramp Force (DIEFT_RAMPFORCE)",
-			"Periodic Force (DIEFT_PERIODIC)",
-			"Conditional Force (DIEFT_CONDITION)",
-			"Custom Force (DIEFT_CUSTOMFORCE)",
-			"Unknown / Unsupported"
-		};
-		DWORD effect_type = DIEFT_GETTYPE(fxId);
+#ifdef _DEBUG
+	// Get the effect name from the controller's effect flags.
+	// The controller-specific flags are defined in dieffectattributes.h and should match
+	// what the controller has installed in OEMForceFeedback registry key.
+	char* VibrationController::EffectNameFromCET(DWORD controllerEffectFlags) {
 		char* fxName;
-
-		switch (effect_type) {
+		switch (DIEFT_GETTYPE(controllerEffectFlags)) {
 		case DIEFT_CONSTANTFORCE:
-			fxName = effect_id_table[0];
+			fxName = "Constant force (DIEFT_CONSTANTFORCE)";
 			break;
 		case DIEFT_RAMPFORCE:
-			fxName = effect_id_table[1];
+			fxName = "Ramp Force (DIEFT_RAMPFORCE)";
 			break;
 		case DIEFT_PERIODIC:
-			fxName = effect_id_table[2];
+			fxName = "Periodic Force (DIEFT_PERIODIC)";
 			break;
 		case DIEFT_CONDITION:
-			fxName = effect_id_table[3];
+			fxName = "Conditional Force (DIEFT_CONDITION)";
 			break;
 		case DIEFT_CUSTOMFORCE:
-			fxName = effect_id_table[4];
+			fxName = "Custom Force (DIEFT_CUSTOMFORCE)";
 			break;
 		default:
-			fxName = effect_id_table[5];
+			fxName = "Unknown / Unsupported";
 		}
 
 		return fxName;
 	}
 
-	char* effectNameFromDeviceID(DWORD dwEffectId) {
+	// Get the effect name from its dwInternalEffectType flags.
+	// They should resemble what's in OEMForceFeedback but don't
+	// necessarily need, as they are used just for debugging purposes.
+	char* effectNameFromIET(DWORD dwInternalEffectType) {
 		char* fxName;
 
-		switch (dwEffectId) {
+		switch (dwInternalEffectType) {
 		case CEID_ConstantForce:
 			fxName = "Constant Force";
 			break;
@@ -144,9 +141,13 @@ namespace vibration {
 
 		return fxName;
 	}
+#endif
 
-	DWORD fxFlagsFromEffectId(DWORD dwEffectId) {
-		switch (dwEffectId) {
+	// Get controller-specific Effects Type flags from its dwInternalEffectType flags.
+	// The controller-specific flags are defined in dieffectattributes.h and should match
+	// what the controller has installed in OEMForceFeedback registry key.
+	DWORD fxFlagsFromIET(DWORD dwInternalEffectType) {
+		switch (dwInternalEffectType) {
 		case CEID_ConstantForce:
 			return CETYPE_ConstantForce;
 		case CEID_RampForce:
@@ -176,8 +177,11 @@ namespace vibration {
 		}
 	}
 
-	DWORD fxCapabsFromEffectType(DWORD fxType) {
-		switch (fxType) {
+	// Get controller-specific effects' capabilities from the Controller Effect flags.
+	// The controller-specific flags are defined in dieffectattributes.h and should match
+	// what the controller has installed in OEMForceFeedback registry key.
+	DWORD fxCapabsFromCET(DWORD controllerEffectFlags) {
+		switch (controllerEffectFlags) {
 		case DIEFT_CONSTANTFORCE:
 			return CESP_ConstantForce;
 		case DIEFT_RAMPFORCE:
@@ -345,32 +349,32 @@ namespace vibration {
 		return idx;
 	}
 
-	HRESULT VibrationController::StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID)
+	HRESULT VibrationController::EnqueueEffect(DWORD dwDeviceID, DWORD dwInternalEffectType, LPDWORD lpdwDnloadID, LPCDIEFFECT lpEffect, DWORD dwFlags)
 	{
 		LPDIENVELOPE envelope;
 
-		DWORD fxDeviceFlags = fxFlagsFromEffectId(dwEffectID);
+		DWORD fxDeviceFlags = fxFlagsFromIET(dwInternalEffectType);
 		byte fxType = DIEFT_GETTYPE(fxDeviceFlags);
-		DWORD fxCapabs = fxCapabsFromEffectType(fxType);
+		DWORD fxCapabs = fxCapabsFromCET(fxType);
 
 		if (fxDeviceFlags == 0x00) {
 #ifdef _DEBUG
 			LogMessage("Start effect: no effect with the provided id exists. device: %lu, effect: %s (%s, id:0x%04lx)",
-				dwID, effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), dwEffectID);
+				dwDeviceID, effectNameFromIET(dwInternalEffectType), EffectNameFromCET(fxType), dwInternalEffectType);
 #endif
 			return DIERR_INCOMPLETEEFFECT;
 		}
 
-		DWORD specificParamsSize = peff->cbTypeSpecificParams;
+		DWORD specificParamsSize = lpEffect->cbTypeSpecificParams;
 #ifdef _DEBUG
 		LogMessage("Start Effect: %s (%s, flags: 0x%04lx), dwId=0x%lx, duration:%lums, specific params size: %lub, gain: %lu",
-			effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), fxDeviceFlags,
-			dwID, peff->dwDuration / 1000, specificParamsSize, peff->dwGain);
+			effectNameFromIET(dwInternalEffectType), EffectNameFromCET(fxType), fxDeviceFlags,
+			dwDeviceID, lpEffect->dwDuration / 1000, specificParamsSize, lpEffect->dwGain);
 		/* This is only useful while building dieffectattributes.h
 		LogMessage("Effect information: %s (%s, flags: 0x%04lx)\n"
 			" [%c] Hardware Effect      [%c] Force Feedback Attack [%c] Force Feedback Fade\n"
 			" [%c] Saturation           [%c] Pos/neg Coefficients  [%c] Pos/neg Saturation",
-			effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), fxDeviceFlags,
+			effectNameFromDeviceID(dwInternalEffectType), EffectNameFromID(fxType), fxDeviceFlags,
 #define fxf(mask) fxDeviceFlags & mask ? 'x' : ' '
 			fxf(DIEFT_HARDWARE), fxf(DIEFT_FFATTACK), fxf(DIEFT_FFFADE),
 			fxf(DIEFT_SATURATION), fxf(DIEFT_POSNEGCOEFFICIENTS), fxf(DIEFT_POSNEGSATURATION));
@@ -390,8 +394,8 @@ namespace vibration {
 		LogMessage("Effect flags (0x%04lx):\n"
 			" Object referenced: (%c) By IDs     (%c) By Offset\n"
 			" Coordinate system: (%c) Cartesian  (%c) Polar      (%c) Spherical",
-			peff->dwFlags,
-#define fxe(mask) peff->dwFlags & mask ? 'o' : ' '
+			lpEffect->dwFlags,
+#define fxe(mask) lpEffect->dwFlags & mask ? 'o' : ' '
 			fxe(DIEFF_OBJECTIDS), fxe(DIEFF_OBJECTOFFSETS),
 			fxe(DIEFF_CARTESIAN), fxe(DIEFF_POLAR), fxe(DIEFF_SPHERICAL));
 #endif
@@ -400,16 +404,16 @@ namespace vibration {
 		if (specificParamsSize == 0) {
 			// No specific effects. Go on.
 		} else if (fxType == DIEFT_CONSTANTFORCE && specificParamsSize == sizeof(DICONSTANTFORCE)) {
-			LPDICONSTANTFORCE constantForceParams = (LPDICONSTANTFORCE)peff->lpvTypeSpecificParams;
-			if (peff->lpEnvelope != nullptr) {
-				if (sizeof(*peff->lpEnvelope) != sizeof(DIENVELOPE)) {
+			LPDICONSTANTFORCE constantForceParams = (LPDICONSTANTFORCE)lpEffect->lpvTypeSpecificParams;
+			if (lpEffect->lpEnvelope != nullptr) {
+				if (sizeof(*lpEffect->lpEnvelope) != sizeof(DIENVELOPE)) {
 #ifdef _DEBUG
 					LogMessage("Provided envelope to Constant Force effect does not match envelope size. Provided:%lu, DIENVELOPE:%lu",
-						sizeof(*peff->lpEnvelope), sizeof(DIENVELOPE));
+						sizeof(*lpEffect->lpEnvelope), sizeof(DIENVELOPE));
 #endif
 					return DIERR_INVALIDPARAM;
 				}
-				envelope = peff->lpEnvelope;
+				envelope = lpEffect->lpEnvelope;
 
 				magnitude = max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel));
 				// dwAttackLevel: initial force (0-10k)
@@ -434,25 +438,25 @@ namespace vibration {
 				 magnitude, constantForceParams->lMagnitude);
 #endif
 		} else if (fxType == DIEFT_RAMPFORCE && specificParamsSize == sizeof(DIRAMPFORCE)) {
-			if (peff->lpEnvelope != nullptr) {
+			if (lpEffect->lpEnvelope != nullptr) {
 #ifdef _DEBUG
 				LogMessage("Ramp force can't take an envelope: envelope size:%lu",
-					sizeof(peff->lpEnvelope));
+					sizeof(lpEffect->lpEnvelope));
 #endif
 				return DIERR_INVALIDPARAM;
 			}
-			LPDIRAMPFORCE rampForceParams = (LPDIRAMPFORCE)peff->lpvTypeSpecificParams;
+			LPDIRAMPFORCE rampForceParams = (LPDIRAMPFORCE)lpEffect->lpvTypeSpecificParams;
 #ifdef _DEBUG
 			LogMessage("Ramp force effects not supported.");
 #endif
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_PERIODIC && specificParamsSize == sizeof(DIPERIODIC)) {
-			LPDIPERIODIC periodicForceParams = (LPDIPERIODIC)peff->lpvTypeSpecificParams;
-			if (peff->lpEnvelope != nullptr) {
-				if (sizeof(*peff->lpEnvelope) != sizeof(DIENVELOPE)) {
+			LPDIPERIODIC periodicForceParams = (LPDIPERIODIC)lpEffect->lpvTypeSpecificParams;
+			if (lpEffect->lpEnvelope != nullptr) {
+				if (sizeof(*lpEffect->lpEnvelope) != sizeof(DIENVELOPE)) {
 					return DIERR_INVALIDPARAM;
 				}
-				envelope = peff->lpEnvelope;
+				envelope = lpEffect->lpEnvelope;
 
 				magnitude = max(0, min(DI_FFNOMINALMAX, envelope->dwAttackLevel));
 				// dwAttackLevel: initial force (0-10k)
@@ -481,27 +485,27 @@ namespace vibration {
 #endif
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_CUSTOMFORCE && specificParamsSize == sizeof(DICUSTOMFORCE)) {
-			if (peff->lpEnvelope != nullptr) {
+			if (lpEffect->lpEnvelope != nullptr) {
 #ifdef _DEBUG
 				LogMessage("Custom force can't take an envelope. envelope size:%lu",
-					sizeof(peff->lpEnvelope));
+					sizeof(lpEffect->lpEnvelope));
 #endif
 				return DIERR_INVALIDPARAM;
 			}
-			LPDICUSTOMFORCE customForceParams = (LPDICUSTOMFORCE)peff->lpvTypeSpecificParams;
+			LPDICUSTOMFORCE customForceParams = (LPDICUSTOMFORCE)lpEffect->lpvTypeSpecificParams;
 #ifdef _DEBUG
 			LogMessage("Custom force effects not supported.");
 #endif
 			return ERROR_NOT_SUPPORTED;
 		} else if (fxType == DIEFT_CONDITION && specificParamsSize == sizeof(DICONDITION)) {
-			if (peff->lpEnvelope != nullptr) {
+			if (lpEffect->lpEnvelope != nullptr) {
 #ifdef _DEBUG
 				LogMessage("Condition can't take an envelope. envelope size:%lu",
-					sizeof(peff->lpEnvelope));
+					sizeof(lpEffect->lpEnvelope));
 #endif
 				return DIERR_INVALIDPARAM;
 			}
-			LPDICONDITION conditionParamList = (LPDICONDITION)peff->lpvTypeSpecificParams;
+			LPDICONDITION conditionParamList = (LPDICONDITION)lpEffect->lpvTypeSpecificParams;
 #ifdef _DEBUG
 			LogMessage("Condition effects not supported.");
 #endif
@@ -519,28 +523,28 @@ namespace vibration {
 		DWORD now = GetTickCount();
 
 		byte str = 0;
-		if (magnitude != 0 && peff->dwGain > 0) {
-			if (peff->dwGain != 10000) {
-				magnitude *= max(0, min(DI_FFNOMINALMAX, peff->dwGain)) / 10000.0f;
+		if (magnitude != 0 && lpEffect->dwGain > 0) {
+			if (lpEffect->dwGain != 10000) {
+				magnitude *= max(0, min(DI_FFNOMINALMAX, lpEffect->dwGain)) / 10000;
 			}
 
 			// DI_FFNOMINALMAX - 254 => str = (magnitude * 254) / DI_FFNOMINALMAX
 			//       magnitude - str
-			str = magnitude * (254.0f / DI_FFNOMINALMAX); // group by the constants for optimization
+			str = static_cast<byte>(magnitude * (254.0f / DI_FFNOMINALMAX)); // group by the constants for optimization
 		}
 
 		mtxSync.lock();
-		int idx = getEffectSlot(dwID, dwEffectID);
+		int idx = getEffectSlot(dwDeviceID, dwInternalEffectType);
 		if (idx < 0) {
 #ifdef _DEBUG
 			LogMessage("Start Effect: no free slots found to allocate effect. device: %lu, effect: %s (%s, id:0x%04lx), flags: %04lx",
-				dwID, effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), dwEffectID, fxDeviceFlags);
+				dwDeviceID, effectNameFromIET(dwInternalEffectType), EffectNameFromCET(fxType), dwInternalEffectType, fxDeviceFlags);
 #endif
 			mtxSync.unlock();
 			return DIERR_DEVICEFULL;
 		}
 
-		VibrationEff *fx = &VibEffects[idx][dwID];
+		VibrationEff *fx = &VibEffects[idx][dwDeviceID];
 		if (str == 0) {
 			if (fx->isActive) {
 				if (fx->started) {
@@ -570,17 +574,17 @@ namespace vibration {
 			// 254 - 100
 			// mgn - x
 			// x = 100 * mgn / 254
-			if (peff->dwDuration == INFINITE)
+			if (lpEffect->dwDuration == INFINITE)
 				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: never", idx, (str * 100.0f) / 254.0f);
 			else
-				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: %lu", idx, (str * 100.0f) / 254.0f, peff->dwDuration);
+				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: %lu", idx, (str * 100.0f) / 254.0f, lpEffect->dwDuration);
 #endif
 			fx->strength = str;
-			fx->dwEffectId = dwEffectID;
-			fx->dwStartFrame = now + (peff->dwStartDelay / 1000);
+			fx->dwEffectId = dwInternalEffectType;
+			fx->dwStartFrame = now + (lpEffect->dwStartDelay / 1000);
 			fx->dwStopFrame =
-				peff->dwDuration == INFINITE ? INFINITE :
-				fx->dwStartFrame + (peff->dwDuration / 1000);
+				lpEffect->dwDuration == INFINITE ? INFINITE :
+				fx->dwStartFrame + (lpEffect->dwDuration / 1000);
 			fx->isActive = TRUE;
 			fx->started = FALSE;
 		}
@@ -589,76 +593,78 @@ namespace vibration {
 #ifdef _DEBUG
 		LogMessage("Effect has been queued for execution.");
 #endif
-		StartVibrationThread(dwID);
+		StartVibrationThread(dwDeviceID);
 
 		return S_OK;
 	}
 
-	void VibrationController::StopEffect(DWORD dwEffectID, DWORD dwID)
+	// !!! StopEffect !!! Reverse all references !!!
+	void VibrationController::DequeueEffect(DWORD dwDeviceID, DWORD dwInternalEffectType)
 	{
 #if _DEBUG
 		LogMessage("Effect stop requested for dwEffectID:%lu (%s, %u), dwID:%lu",
-			dwEffectID, EffectNameFromID(dwEffectID), DIEFT_GETTYPE(dwEffectID), dwID);
+			dwInternalEffectType, EffectNameFromCET(dwInternalEffectType),
+			DIEFT_GETTYPE(fxFlagsFromIET(dwInternalEffectType)), dwDeviceID);
 #endif
 		mtxSync.lock();
 		for (int k = 0; k < MAX_EFFECTS; k++) {
-			if (VibEffects[k][dwID].dwEffectId != dwEffectID)
+			if (VibEffects[k][dwDeviceID].dwEffectId != dwInternalEffectType)
 				continue;
 
-			VibEffects[k][dwID].dwStopFrame = 0;
+			VibEffects[k][dwDeviceID].dwStopFrame = 0;
 		}
 		
 		mtxSync.unlock();
 	}
 
-	void VibrationController::StopAllEffects(DWORD dwID)
+	void VibrationController::DequeueAllEffects(DWORD dwDeviceID)
 	{
 #if _DEBUG
-		LogMessage("Stop all effects requested for dwID:%lu", dwID);
+		LogMessage("Stop all effects requested for dwID:%lu", dwDeviceID);
 #endif
 		mtxSync.lock();
 		for (int k = 0; k < MAX_EFFECTS; k++) {
-			VibEffects[k][dwID].dwStopFrame = 0;
+			VibEffects[k][dwDeviceID].dwStopFrame = 0;
 		}
 		mtxSync.unlock();
 
-		Reset(dwID);
+		Reset(dwDeviceID);
 	}
 
-	void VibrationController::Pause(DWORD dwID)
+	void VibrationController::Pause(DWORD dwDeviceID)
 	{
-		if (!paused[dwID]) {
-			paused_at_frame[dwID] = GetTickCount();
-			paused[dwID] = true;
+		if (!paused[dwDeviceID]) {
+			paused_at_frame[dwDeviceID] = GetTickCount();
+			paused[dwDeviceID] = true;
 #if _DEBUG
-			LogMessage("Pause all effects requested for dwID:%lu. Reference frame: %lu", dwID, paused_at_frame[dwID]);
+			LogMessage("Pause all effects requested for dwID:%lu. Reference frame: %lu", dwDeviceID, paused_at_frame[dwDeviceID]);
 #endif
 		} else {
 			// If we re-pause and refresh the current frame, we would lose a reliable reference to update
 			// frame count left for running effects when we resume execution.
 #if _DEBUG
-			LogMessage("Pause all effects re-requested for dwID:%lu (already paused). Reference frame: %lu", dwID, paused_at_frame[dwID]);
+			LogMessage("Pause all effects re-requested for dwID:%lu (already paused). Reference frame: %lu", dwDeviceID, paused_at_frame[dwDeviceID]);
 #endif
 		}
 	}
 
-	void VibrationController::Resume(DWORD dwID)
+	void VibrationController::Resume(DWORD dwDeviceID)
 	{
 		VibrationEff fx;
 		DWORD frame, deltaf;
 
-		if (paused[dwID]) {
+		if (paused[dwDeviceID]) {
 			frame = GetTickCount();
-			deltaf = frame - paused_at_frame[dwID];
+			deltaf = frame - paused_at_frame[dwDeviceID];
 #if _DEBUG
 			LogMessage("Resuming effects for dwID:%lu. Was paused at frame %lu. Paused for %lu frames.",
-				dwID, paused_at_frame[dwID], deltaf);
+				dwDeviceID, paused_at_frame[dwDeviceID], deltaf);
 #endif
 
 			mtxSync.lock();
 			for (int k = 0; k < MAX_EFFECTS; k++) {
-				fx = VibEffects[k][dwID];
-				if (fx.dwStopFrame != INFINITE && fx.dwStopFrame < paused_at_frame[dwID]) {
+				fx = VibEffects[k][dwDeviceID];
+				if (fx.dwStopFrame != INFINITE && fx.dwStopFrame < paused_at_frame[dwDeviceID]) {
 #ifdef _DEBUG
 					LogMessage("Effect in slot #%i: forwarding stop frame from %lu to %lu.",
 						k, fx.dwStopFrame, fx.dwStopFrame + deltaf);
@@ -673,7 +679,7 @@ namespace vibration {
 			mtxSync.unlock();
 #if _DEBUG
 		} else {
-			LogMessage("Effects for dwID:%lu are not paused. Can't resume non-paused effects.", dwID);
+			LogMessage("Effects for dwID:%lu are not paused. Can't resume non-paused effects.", dwDeviceID);
 #endif
 		}
 	}
