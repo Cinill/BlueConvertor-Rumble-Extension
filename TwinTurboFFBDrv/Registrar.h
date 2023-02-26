@@ -124,6 +124,7 @@ private:
 			b1,0x01,0x00,0x00,b5,b6,0x00,0x00,b9,0x03,0x00,0x00,0xed,0x03,0x00,0x00,0x30,0x00,0x00,0x00
 		};
 
+		// TODO #13: use constant from dinput.h (GUID_ConstantForce, ...)
 		sprintf_s(buffer, "%s\\Effects\\{13541C2%01X-8E33-11D0-9AD0-00A0C9A06E35}", oemPath, keyIdx);
 
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, buffer, "", fxName) ||
