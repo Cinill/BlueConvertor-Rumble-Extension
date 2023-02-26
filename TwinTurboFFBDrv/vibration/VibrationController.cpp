@@ -533,17 +533,52 @@ namespace vibration {
 			return ERROR_NOT_SUPPORTED;
 		}
 
-		DWORD frame = GetTickCount();
+		DWORD now = GetTickCount();
 
-		VibEffects[idx][dwID].strength = magnitude;
-
-		VibEffects[idx][dwID].dwEffectId = dwEffectID;
-		VibEffects[idx][dwID].dwStartFrame = frame + (peff->dwStartDelay / 1000);
-		VibEffects[idx][dwID].dwStopFrame =
-			peff->dwDuration == INFINITE ? INFINITE : 
-			VibEffects[idx][dwID].dwStartFrame + (peff->dwDuration / 1000);
-		VibEffects[idx][dwID].isActive = TRUE;
-		VibEffects[idx][dwID].started = FALSE;
+		VibrationEff *fx = &VibEffects[idx][dwID];
+		if (magnitude == 0) {
+			if (fx->isActive) {
+				if (fx->started) {
+					// Effect is running, just set it to stop then.
+#ifdef _DEBUG
+					LogMessage("Zero magnitude strength to effect executing. Setting its time to stop as \"now\".");
+#endif
+					fx->dwStopFrame = now;
+				}
+				else {
+					// Effect had a strength but didn't have a chance to start before it received zero-strength.
+					// Effect slot will become available.
+#ifdef _DEBUG
+					LogMessage("Zero magnitude strength to effect not yet started. Deactivating it.");
+#endif
+					fx->isActive = false;
+				}
+			} else {
+#ifdef _DEBUG
+				LogMessage("Zero magnitude strength to new effect. Returning DI_NOEFFECT.");
+#endif
+				mtxSync.unlock();
+				return DI_NOEFFECT;
+			}
+		} else {
+#ifdef _DEBUG
+			// 254 - 100
+			// mgn - x
+			// x = 100 * mgn / 254
+			if (peff->dwDuration == INFINITE)
+				LogMessage("Applying effect. Strength: %.2f%%, stop: never", (magnitude * 100.0f) / 254.0f);
+			else
+				LogMessage("Applying effect. Strength: %.2f%%, stop: %lu", (magnitude * 100.0f) / 254.0f, peff->dwDuration);
+#endif
+			fx->strength = magnitude;
+			fx->dwEffectId = dwEffectID;
+			fx->dwStartFrame = now + (peff->dwStartDelay / 1000);
+			fx->dwStopFrame =
+				peff->dwDuration == INFINITE ? INFINITE :
+				fx->dwStartFrame + (peff->dwDuration / 1000);
+			fx->isActive = TRUE;
+			fx->started = FALSE;
+		}
 
 		mtxSync.unlock();
 #ifdef _DEBUG
