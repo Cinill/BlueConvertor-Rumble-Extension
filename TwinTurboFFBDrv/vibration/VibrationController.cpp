@@ -361,10 +361,11 @@ namespace vibration {
 			return DIERR_INCOMPLETEEFFECT;
 		}
 
+		DWORD specificParamsSize = peff->cbTypeSpecificParams;
 #ifdef _DEBUG
-		LogMessage("Start Effect: %s (%s, flags: 0x%04lx), dwId=0x%lx, duration:%lums",
+		LogMessage("Start Effect: %s (%s, flags: 0x%04lx), dwId=0x%lx, duration:%lums, specific params size: %lub, gain: %lu",
 			effectNameFromDeviceID(dwEffectID), EffectNameFromID(fxType), fxDeviceFlags,
-			dwID, peff->dwDuration / 1000);
+			dwID, peff->dwDuration / 1000, specificParamsSize, peff->dwGain);
 		/* This is only useful while building dieffectattributes.h
 		LogMessage("Effect information: %s (%s, flags: 0x%04lx)\n"
 			" [%c] Hardware Effect      [%c] Force Feedback Attack [%c] Force Feedback Fade\n"
@@ -395,11 +396,7 @@ namespace vibration {
 			fxe(DIEFF_CARTESIAN), fxe(DIEFF_POLAR), fxe(DIEFF_SPHERICAL));
 #endif
 
-		// Calculating intensity
 		DWORD magnitude = 0x0;
-
-		DWORD specificParamsSize = peff->cbTypeSpecificParams;
-
 		if (specificParamsSize == 0) {
 			// No specific effects. Go on.
 		} else if (fxType == DIEFT_CONSTANTFORCE && specificParamsSize == sizeof(DICONSTANTFORCE)) {
@@ -420,7 +417,7 @@ namespace vibration {
 				// dwFadeLevel: force after effect ends (0-10k)
 				// dwFadeTime: time between lMagnitude and FadeLevel (microsseconds)
 #ifdef _DEBUG
-				LogMessage("Ignored envelope for Constant Force. attackLevel:%lu, attackTime:%lu, fadeLevel:%lu, fadeTime:%lu, magnitude:%u",
+				LogMessage("Ignored envelope for Constant Force. attackLevel:%lu, attackTime:%lu, fadeLevel:%lu, fadeTime:%lu, magnitude:%lu",
 					envelope->dwAttackLevel, envelope->dwAttackTime, envelope->dwFadeLevel, envelope->dwFadeTime, magnitude);
 #endif
 			} else {
@@ -428,12 +425,12 @@ namespace vibration {
 				if (constantForceParams->lMagnitude < 0) constantForceParams->lMagnitude = constantForceParams->lMagnitude * (-1);
 				magnitude = max(0, min(DI_FFNOMINALMAX, constantForceParams->lMagnitude));
 #ifdef _DEBUG
-				LogMessage("Constant Force with magnitude specific parameter. magnitude: %lu, compressed to 0-10k: %02X",
+				LogMessage("Constant Force with magnitude specific parameter. magnitude: %lu, compressed to 0-10k: %lu",
 					constantForceParams->lMagnitude, magnitude);
 #endif
 			}
 #ifdef _DEBUG
-			LogMessage("Constant force effect handled. byteMagnitude:%u, diMagnitude:%lu",
+			LogMessage("Constant force effect handled. byteMagnitude:%lu, diMagnitude:%lu",
 				 magnitude, constantForceParams->lMagnitude);
 #endif
 		} else if (fxType == DIEFT_RAMPFORCE && specificParamsSize == sizeof(DIRAMPFORCE)) {
@@ -467,7 +464,7 @@ namespace vibration {
 				//  attained every dwPeriod/2.
 				// Wonder how to represent this in a single puny vibration motor. :P
 #ifdef _DEBUG
-				LogMessage("Ignored envelope for Constant Force: attackLevel=%lu attackTime=%lu fadeLevel=%lu fadeTime:%lu, magnitude:%u",
+				LogMessage("Ignored envelope for Constant Force: attackLevel=%lu attackTime=%lu fadeLevel=%lu fadeTime:%lu, magnitude:%lu",
 					envelope->dwAttackLevel, envelope->dwAttackTime, envelope->dwFadeLevel, envelope->dwFadeTime, magnitude);
 #endif
 			} else {
