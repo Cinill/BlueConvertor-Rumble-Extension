@@ -20,9 +20,9 @@ namespace vibration {
 	void SendHidCommand(HANDLE hHidDevice, const byte* buff, DWORD buffsz) {
 		HidD_SetOutputReport(hHidDevice, (PVOID)buff, 5);
 	}
-	void SendVibrationForce(HANDLE hHidDevice, byte forceSmallMotor, byte forceBigMotor, DWORD dwID) {
+	void SendVibrationForce(HANDLE hHidDevice, byte strength, DWORD dwID) {
 		byte buffer1[] = {
-			0x00, 0x01, 0x00, forceBigMotor, forceSmallMotor
+			0x00, 0x01, 0x00, strength, 0x00
 		};
 		buffer1[0] = (byte) dwID + 1;
 		SendHidCommand(hHidDevice, buffer1, 5);
@@ -40,8 +40,7 @@ namespace vibration {
 		DWORD dwStartFrame;
 		DWORD dwStopFrame;
 
-		byte forceX;
-		byte forceY;
+		byte strength;
 
 		BOOL isActive;
 		BOOL started;
@@ -230,8 +229,7 @@ namespace vibration {
 			FILE_FLAG_OVERLAPPED,
 			NULL);
 
-		byte lastForceX = 0;
-		byte lastForceY = 0;
+		byte currStrength = 0;
 
 		while (true) {
 			mtxSync.lock();
@@ -246,8 +244,7 @@ namespace vibration {
 			}
 
 			DWORD frame = GetTickCount();
-			byte forceX = 0;
-			byte forceY = 0;
+			byte strength = 0;
 
 			for (int k = 0; k < MAX_EFFECTS; k++) {
 				if (!VibEffects[k][dwID].isActive)
@@ -264,13 +261,11 @@ namespace vibration {
 							VibEffects[k][dwID].isActive = FALSE;
 						}
 						else {
-							forceX = MAXC(forceX, VibEffects[k][dwID].forceX);
-							forceY = MAXC(forceY, VibEffects[k][dwID].forceY);
+							strength = MAXC(strength, VibEffects[k][dwID].strength);
 						}
 					}
 					else {
-						forceX = MAXC(forceX, VibEffects[k][dwID].forceX);
-						forceY = MAXC(forceY, VibEffects[k][dwID].forceY);
+						strength = MAXC(strength, VibEffects[k][dwID].strength);
 					}
 				}
 				else {
@@ -292,24 +287,22 @@ namespace vibration {
 #endif
 
 
-						forceX = MAXC(forceX, VibEffects[k][dwID].forceX);
-						forceY = MAXC(forceY, VibEffects[k][dwID].forceY);
+						strength = MAXC(strength, VibEffects[k][dwID].strength);
 					}
 				}
 			}
 
-			if (forceX != lastForceX || forceY != lastForceY) {
+			if (strength != currStrength) {
 #ifdef _DEBUG
-				LogMessage("Sending rumble command: dwId:0x%lx, forceX:%u, forcey:%u", dwID, forceX, forceY);
+				LogMessage("Sending rumble command: dwId:0x%lx, strength:%u", dwID, strength);
 #endif
 				// Send the command
-				if (forceX == 0 && forceY == 0)
+				if (strength == 0)
 					SendVibrationStop(hHidDevice[dwID], dwID);
 				else
-					SendVibrationForce(hHidDevice[dwID], forceX, forceY, dwID);
+					SendVibrationForce(hHidDevice[dwID], strength, dwID);
 
-				lastForceX = forceX;
-				lastForceY = forceY;
+				currStrength = strength;
 			}
 
 			mtxSync.unlock();
@@ -408,9 +401,6 @@ namespace vibration {
 #endif
 
 		// Calculating intensity
-		byte forceX = 0x0;
-		byte forceY = 0x0;
-
 		byte magnitude = 0x0;
 
 		DWORD specificParamsSize = peff->cbTypeSpecificParams;
@@ -545,8 +535,7 @@ namespace vibration {
 
 		DWORD frame = GetTickCount();
 
-		VibEffects[idx][dwID].forceX = magnitude;
-		VibEffects[idx][dwID].forceY = 0;
+		VibEffects[idx][dwID].strength = magnitude;
 
 		VibEffects[idx][dwID].dwEffectId = dwEffectID;
 		VibEffects[idx][dwID].dwStartFrame = frame + (peff->dwStartDelay / 1000);
