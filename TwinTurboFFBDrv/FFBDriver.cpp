@@ -23,7 +23,7 @@ void LogMessage(const char* fmt, ...) {
 	FILE* log_file = fopen(LOGPATH LOGFILE, "a");
 
 	// [XXXX-XX-XX XX:XX:XX.XXX UTC: ] => 29 chars
-	fprintf_s(log_file, "%04d-%02d-%02d %02d:%02d:%02d.%03d UTC:",
+	fprintf_s(log_file, "%04d-%02d-%02d %02d:%02d:%02d.%03d UTC: ",
 		st.wYear, st.wMonth, st.wDay,
 		st.wHour, st.wMinute, st.wSecond,
 		st.wMilliseconds);
