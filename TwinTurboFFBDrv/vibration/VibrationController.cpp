@@ -8,6 +8,9 @@
 #define MAX_EFFECTS 5
 #define MAXC(a, b) ((a) > (b) ? (a) : (b))
 
+#define ACTUATOR_SMALL 0x01000002
+#define ACTUATOR_BIG   0x01000102
+
 #ifdef _DEBUG
 void LogMessage(const char* fmt, ...);
 #endif
@@ -20,9 +23,9 @@ namespace vibration {
 	void SendHidCommand(HANDLE hHidDevice, const byte* buff, DWORD buffsz) {
 		HidD_SetOutputReport(hHidDevice, (PVOID)buff, 5);
 	}
-	void SendVibrationForce(HANDLE hHidDevice, byte strength, DWORD dwID) {
+	void SendVibrationForce(HANDLE hHidDevice, byte a1str, byte a2str, DWORD dwID) {
 		byte buffer1[] = {
-			0x00, 0x01, 0x00, strength, 0x00
+			0x00, 0x01, 0x00, a1str, a2str
 		};
 		buffer1[0] = (byte) dwID + 1;
 		SendHidCommand(hHidDevice, buffer1, 5);
@@ -40,7 +43,8 @@ namespace vibration {
 		DWORD dwStartFrame;
 		DWORD dwStopFrame;
 
-		byte strength;
+		byte a1str;
+		byte a2str;
 
 		BOOL isActive;
 		BOOL started;
@@ -233,7 +237,8 @@ namespace vibration {
 			FILE_FLAG_OVERLAPPED,
 			NULL);
 
-		byte currStrength = 0;
+		byte curra1str = 0;
+		byte curra2str = 0;
 
 		while (true) {
 			mtxSync.lock();
@@ -248,7 +253,8 @@ namespace vibration {
 			}
 
 			DWORD frame = GetTickCount();
-			byte strength = 0;
+			byte a1str = 0;
+			byte a2str = 0;
 
 			for (int k = 0; k < MAX_EFFECTS; k++) {
 				if (!VibEffects[k][dwID].isActive)
@@ -265,11 +271,13 @@ namespace vibration {
 							VibEffects[k][dwID].isActive = FALSE;
 						}
 						else {
-							strength = MAXC(strength, VibEffects[k][dwID].strength);
+							a1str = MAXC(a1str, VibEffects[k][dwID].a1str);
+							a2str = MAXC(a2str, VibEffects[k][dwID].a2str);
 						}
 					}
 					else {
-						strength = MAXC(strength, VibEffects[k][dwID].strength);
+						a1str = MAXC(a1str, VibEffects[k][dwID].a1str);
+						a2str = MAXC(a2str, VibEffects[k][dwID].a2str);
 					}
 				}
 				else {
@@ -290,23 +298,25 @@ namespace vibration {
 						}
 #endif
 
-
-						strength = MAXC(strength, VibEffects[k][dwID].strength);
+						a1str = MAXC(a1str, VibEffects[k][dwID].a1str);
+						a2str = MAXC(a2str, VibEffects[k][dwID].a2str);
 					}
 				}
 			}
 
-			if (strength != currStrength) {
+			if (a1str != curra1str || a2str != curra2str) {
 #ifdef _DEBUG
-				LogMessage("Sending rumble command: dwId:0x%lx, strength:%u", dwID, strength);
+				LogMessage("Sending rumble command: dwId:0x%lx, small actuator strength: %u, big actuator strength: %u",
+					dwID, (a1str * 100.0f) / 254.0f, (a2str * 100.0f) / 254.0f);
 #endif
 				// Send the command
-				if (strength == 0)
+				if (a1str == 0 && a2str == 0)
 					SendVibrationStop(hHidDevice[dwID], dwID);
 				else
-					SendVibrationForce(hHidDevice[dwID], strength, dwID);
+					SendVibrationForce(hHidDevice[dwID], a1str, a2str, dwID);
 
-				currStrength = strength;
+				curra1str = a1str;
+				curra2str = a2str;
 			}
 
 			mtxSync.unlock();
@@ -366,16 +376,20 @@ namespace vibration {
 		}
 
 		DWORD specificParamsSize = lpEffect->cbTypeSpecificParams;
+
 #ifdef _DEBUG
-		LogMessage("Start Effect: %s (%s, flags: 0x%04lx), dwId=0x%lx, duration:%lums, specific params size: %lub, gain: %lu",
+		LogMessage("Start Effect:\n - %s (%s, flags: 0x%04lx)\n"
+			"   dwId=0x%lx, duration:%lums, specific params size: %lub\n"
+			"   gain: %lu, axis count: %lu",
 			effectNameFromIET(dwInternalEffectType), EffectNameFromCET(fxType), fxDeviceFlags,
-			dwDeviceID, lpEffect->dwDuration / 1000, specificParamsSize, lpEffect->dwGain);
+			dwDeviceID, lpEffect->dwDuration / 1000, specificParamsSize, lpEffect->dwGain, lpEffect->cAxes);
+
 		/* This is only useful while building dieffectattributes.h
 		LogMessage("Effect information: %s (%s, flags: 0x%04lx)\n"
 			" [%c] Hardware Effect      [%c] Force Feedback Attack [%c] Force Feedback Fade\n"
 			" [%c] Saturation           [%c] Pos/neg Coefficients  [%c] Pos/neg Saturation",
 			effectNameFromDeviceID(dwInternalEffectType), EffectNameFromID(fxType), fxDeviceFlags,
-#define fxf(mask) fxDeviceFlags & mask ? 'x' : ' '
+#define fxf(mask) (fxDeviceFlags & mask) != 0 ? 'x' : ' '
 			fxf(DIEFT_HARDWARE), fxf(DIEFT_FFATTACK), fxf(DIEFT_FFFADE),
 			fxf(DIEFT_SATURATION), fxf(DIEFT_POSNEGCOEFFICIENTS), fxf(DIEFT_POSNEGSATURATION));
 #undef fxf
@@ -385,7 +399,7 @@ namespace vibration {
 			" [%c] direction            [%c] envelope              [%c] type-specific params\n"
 			" [%c] force restart        [%c] deny restart          [%c] don't download",
 			fxCapabs,
-#define fxc(mask) fxCapabs & mask ? 'x' : ' '
+#define fxc(mask) (fxCapabs & mask) != 0 ? 'x' : ' '
 			fxc(DIEP_DURATION), fxc(DIEP_SAMPLEPERIOD), fxc(DIEP_GAIN),
 			fxc(DIEP_TRIGGERBUTTON), fxc(DIEP_TRIGGERREPEATINTERVAL), fxc(DIEP_AXES),
 			fxc(DIEP_DIRECTION), fxc(DIEP_ENVELOPE), fxc(DIEP_TYPESPECIFICPARAMS),
@@ -399,6 +413,54 @@ namespace vibration {
 			fxe(DIEFF_OBJECTIDS), fxe(DIEFF_OBJECTOFFSETS),
 			fxe(DIEFF_CARTESIAN), fxe(DIEFF_POLAR), fxe(DIEFF_SPHERICAL));
 #endif
+
+		bool smallActuator = false;
+		bool bigActuator = false;
+
+		if (lpEffect->cAxes > 0) {
+			bool hasAxisRefs = lpEffect->dwFlags & (DIEFF_OBJECTIDS | DIEFF_OBJECTOFFSETS);
+			bool axisRefsByOffset = lpEffect->dwFlags & DIEFF_OBJECTOFFSETS;
+
+			// CECOORDS below ensures coordinate systems not supported by the device
+			// (like Spherical) are not accounted for as valid "has direction".
+			bool hasDirection = (lpEffect->dwFlags & CECOORDS ) & (DIEFF_CARTESIAN | DIEFF_POLAR | DIEFF_SPHERICAL);
+			bool cartesianCoords = (lpEffect->dwFlags & CECOORDS ) & DIEFF_CARTESIAN;
+			size_t lastAxisIdx = lpEffect->cAxes - 1;
+			for (size_t i = 0; i < lpEffect->cAxes; i++)
+			{
+				if (!hasAxisRefs) {
+					switch (lpEffect->rgdwAxes[i]) {
+					case ACTUATOR_SMALL:
+						smallActuator = true;
+						break;
+					case ACTUATOR_BIG:
+						bigActuator = true;
+						break;
+#ifdef _DEBUG
+					default:
+						LogMessage("  Actuator reference didn't match any supported actuator. Provided: 0x%08lx, small: 0x%08lx, big: 0x%08lx",
+							lpEffect->rgdwAxes[i], ACTUATOR_SMALL, ACTUATOR_BIG);
+#endif
+					};
+#ifdef _DEBUG
+					// This will vary from 0x01000002 to 0x01000102 when x360ce wants to send values  to the small (00) and big (01) motors.
+					LogMessage("  Ref for actuator #%u: %s: 0x%08lx", i + 1, axisRefsByOffset ? "offset" : "index", lpEffect->rgdwAxes[i]);
+				} else {
+					// This will vary from 0x01000002 to 0x01000102 when x360ce wants to send values  to the small (00) and big (01) motors.
+					LogMessage("  Ref for axis #%u: %s: 0x%08lx", i + 1, axisRefsByOffset ? "offset" : "index", lpEffect->rgdwAxes[i]);
+#endif
+				}
+
+				// If we have direction and not in cartesian coordinates, the value in the last position is not used.
+				//if (hasDirection && (cartesianCoords || i < lastAxisIdx)) {
+#if _DEBUG
+				if ((cartesianCoords || i < lastAxisIdx)) {
+					LogMessage("  Dir for axis #%u: %li %s", i+1, lpEffect->rglDirection[i],
+						cartesianCoords ? "(cartesian)" : (lpEffect->dwFlags & DIEFF_POLAR ? "/100deg (polar)" : "/100deg (spherical)"));
+				}
+#endif
+			}
+		}
 
 		DWORD magnitude = 0x0;
 		if (specificParamsSize == 0) {
@@ -545,49 +607,33 @@ namespace vibration {
 		}
 
 		VibrationEff *fx = &VibEffects[idx][dwDeviceID];
-		if (str == 0) {
-			if (fx->isActive) {
-				if (fx->started) {
-					// Effect is running, just set it to stop then.
 #ifdef _DEBUG
-					LogMessage("Stopping active effect: Zero magnitude strength provided.");
+		// 254 - 100
+		// mgn - x
+		// x = 100 * mgn / 254
+		if (lpEffect->dwDuration == INFINITE)
+			LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: never, small actuator: %s, big actuator: %s",
+				idx, (str * 100.0f) / 254.0f, smallActuator ? "yes" : "no", bigActuator ? "yes" : "no");
+		else
+			LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: %lu, small actuator: %s, big actuator: %s",
+				idx, (str * 100.0f) / 254.0f, lpEffect->dwDuration,
+				smallActuator ? "yes" : "no", bigActuator ? "yes" : "no");
 #endif
-					fx->dwStopFrame = now;
-				}
-				else {
-					// Effect had a strength but didn't have a chance to start before it received zero-strength.
-					// Effect slot will become available.
-#ifdef _DEBUG
-					LogMessage("Set effect not to start: Zero magnitude strength provided.");
-#endif
-					fx->isActive = false;
-				}
-			} else {
-#ifdef _DEBUG
-				LogMessage("Zero magnitude strength to new effect. Returning DI_NOEFFECT.");
-#endif
-				mtxSync.unlock();
-				return DI_NOEFFECT;
-			}
-		} else {
-#ifdef _DEBUG
-			// 254 - 100
-			// mgn - x
-			// x = 100 * mgn / 254
-			if (lpEffect->dwDuration == INFINITE)
-				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: never", idx, (str * 100.0f) / 254.0f);
-			else
-				LogMessage("Applying effect at slot #%u. Strength: %.2f%%, stop: %lu", idx, (str * 100.0f) / 254.0f, lpEffect->dwDuration);
-#endif
-			fx->strength = str;
-			fx->dwEffectId = dwInternalEffectType;
-			fx->dwStartFrame = now + (lpEffect->dwStartDelay / 1000);
-			fx->dwStopFrame =
-				lpEffect->dwDuration == INFINITE ? INFINITE :
-				fx->dwStartFrame + (lpEffect->dwDuration / 1000);
-			fx->isActive = TRUE;
-			fx->started = FALSE;
-		}
+		// Leave the value alone if we're not changing the strength value for an actuator
+		// but the effect is already active.
+		if (smallActuator) fx->a1str = str;
+		else if (!fx->isActive) fx->a1str = 0x00;
+		if (bigActuator) fx->a2str = str;
+		else if (!fx->isActive) fx->a2str = 0x00;
+
+		fx->dwEffectId = dwInternalEffectType;
+		fx->dwStartFrame = now + (lpEffect->dwStartDelay / 1000);
+		fx->dwStopFrame =
+			lpEffect->dwDuration == INFINITE ? INFINITE :
+			fx->dwStartFrame + (lpEffect->dwDuration / 1000);
+
+		fx->isActive = TRUE;
+		fx->started = FALSE;
 
 		mtxSync.unlock();
 #ifdef _DEBUG
