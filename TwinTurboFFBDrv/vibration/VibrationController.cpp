@@ -8,6 +8,12 @@
 #define MAX_EFFECTS 5
 #define MAXC(a, b) ((a) > (b) ? (a) : (b))
 
+// interval between effect polling and sending HID commands.
+// Increase this if the USB bus is being flooded by a game,
+// potentially affecting input from the joystick itself
+// (buttons, steering) and mouse.
+#define POLL_DELAY 10
+
 #define ACTUATOR_SMALL 0x01000002
 #define ACTUATOR_BIG   0x01000102
 
@@ -248,11 +254,12 @@ namespace vibration {
 				break;
 			} else if (paused[dwID]) {
 				mtxSync.unlock();
-				std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				std::this_thread::sleep_for(std::chrono::milliseconds(POLL_DELAY));
 				continue;
 			}
 
 			DWORD frame = GetTickCount();
+
 			byte a1str = 0;
 			byte a2str = 0;
 
@@ -310,10 +317,14 @@ namespace vibration {
 					dwID, (a1str * 100.0f) / 254.0f, (a2str * 100.0f) / 254.0f);
 #endif
 				// Send the command
-				if (a1str == 0 && a2str == 0)
+				if (a1str == 0 && a2str == 0) {
 					SendVibrationStop(hHidDevice[dwID], dwID);
-				else
+				// the effect will only change if the maximum between the
+				// two actuators has changed. No need to flood the HID bus
+				// for this change.
+				} else if (max(a1str, a2str) != max(curra1str, curra2str)) {
 					SendVibrationForce(hHidDevice[dwID], a1str, a2str, dwID);
+				}
 
 				curra1str = a1str;
 				curra2str = a2str;
@@ -321,7 +332,7 @@ namespace vibration {
 
 			mtxSync.unlock();
 
-			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+			std::this_thread::sleep_for(std::chrono::milliseconds(POLL_DELAY));
 		}
 
 		if (hHidDevice[dwID] != NULL) {
