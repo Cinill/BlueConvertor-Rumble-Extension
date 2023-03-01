@@ -6,8 +6,11 @@
 #include <sys/stat.h>
 #define LOGPATH "c:\\cygwin\\var\\log\\"
 #define LOGFILE "ffbdriver.log"
+
+static std::mutex logfile_access;
 #endif
 
+#define STAT_WRITABLE_DIR (S_IWRITE | S_IFDIR)
 void LogMessage(const char* fmt, ...) {
 	va_list args;
 #ifdef _DEBUG
@@ -15,11 +18,14 @@ void LogMessage(const char* fmt, ...) {
 	GetSystemTime(&st);
 	struct stat statdres = { 0 }, statfres = { 0 };
 
-	if (stat(LOGPATH LOGFILE, &statfres)) {
-		if (!(stat(LOGPATH, &statdres))) return; // No log dir at all.
-		else if (!(statdres.st_mode & S_IWRITE & S_IFDIR)) return; // log dir not writable or not a dir
+	if (stat(LOGPATH LOGFILE, &statfres) == -1) {
+		if (stat(LOGPATH, &statdres) == -1)
+			return; // No log dir at all.
+		else if ((statdres.st_mode & STAT_WRITABLE_DIR) != STAT_WRITABLE_DIR)
+			return; // log dir not writable or not a dir
 	} else if (!(statfres.st_mode & S_IWRITE)) return; // File exists but not writable.
 
+	logfile_access.lock();
 	FILE* log_file = fopen(LOGPATH LOGFILE, "a");
 
 	// [XXXX-XX-XX XX:XX:XX.XXX UTC: ] => 29 chars
@@ -34,6 +40,7 @@ void LogMessage(const char* fmt, ...) {
 	fwrite("\n", 1, 1, log_file);
 
 	fclose(log_file);
+	logfile_access.unlock();
 #endif
 }
 
