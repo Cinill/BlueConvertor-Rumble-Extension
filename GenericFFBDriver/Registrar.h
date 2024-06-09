@@ -132,7 +132,7 @@ public:
 			return false;
 
 	// Root ----------------
-		const char* root = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012";
+		const char* root = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0810&PID_0001";
 		const byte oemData[] = { 
 			0x03, 0x00, 0x08, 0x10, 0x0c, 0x00, 0x00, 0x00
 		};
@@ -140,7 +140,7 @@ public:
 			0x00, 0x00, 0x00, 0x00
 		};
 
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "OEMName", "DualShock Adapter"))
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "OEMName", "Blue PS2 to USB Adapter"))
 			return false;
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "OEMData", oemData, 8))
 			return false;
@@ -152,12 +152,12 @@ public:
 		dData[0] = 0xe8; dData[1] = 0x03;
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "Amplify", dData, 4))
 			return false;
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "ConfigCLSID", "{B4FE8B13-40D0-438A-B4C2-DE4522951071}"))
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "ConfigCLSID", "{86062e00-25f2-11ef-8003-444553540000}"))
 			return false;
 	// Root ----------------
 
 	// AXES ----------------	
-		const char* axePath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012\\Axes";
+		const char* axePath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0810&PID_0001\\Axes";
 		byte axeAttrData[] = {
 			0x01, 0x81, 0x00, 0x00, 0x01, 0x00, 0x30, 0x00
 		};
@@ -202,7 +202,7 @@ public:
 	// AXES ----------------
 
 	// Buttons -------------
-		const char* btnPath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012\\Buttons";
+		const char* btnPath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0810&PID_0001\\Buttons";
 		byte btnData[] = {
 			0x02, 0x80, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00
 		};
@@ -217,9 +217,9 @@ public:
 	// Buttons -------------
 	
 	// ForceFeedback -------
-		const char* oemPath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0D9D&PID_3012\\OEMForceFeedback";
+		const char* oemPath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0810&PID_0001\\OEMForceFeedback";
 
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, oemPath, "CLSID", "{B4FE8B13-40D0-438A-B4C2-DE4522951071}"))
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, oemPath, "CLSID", "{86062e00-25f2-11ef-8003-444553540000}"))
 			return false;
 
 		const byte attrVal[] = {

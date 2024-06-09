@@ -1,16 +1,20 @@
-# DualShock Rumble Extension
+# BlueConvertor Rumble Extension
 
-Driver to enable the rumble feature of the DualShock on **VID_0D9D&PID_3012** adapters. 
+Driver to enable the rumble feature of the Twin USB Joystick (Blue convertor) on **VID_0810&PID_0001** adapters. 
+
+## TODO
 Both ports work simultaneously.
 
 ## Instalation
 Use the latest installer found here:
 
-https://github.com/NishiyamaPedro/DualShock-Rumble-Extension/releases
+https://github.com/Cinill/BlueConvertor-Rumble-Extension/releases
 
 **It is highly recommended that you use HidHide and xOutput 3 with this driver for the best experience.**
 
 ### Credits
+
+NishiyamaPedro  - Original project: https://github.com/NishiyamaPedro/DualShock-Rumble-Extension
 
 Alessandro Menezes - Original project: https://github.com/alessandroasm/generic-usb-gamepad-vibration-driver/
 
