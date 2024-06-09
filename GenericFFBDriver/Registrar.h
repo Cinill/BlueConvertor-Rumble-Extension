@@ -152,7 +152,7 @@ public:
 		dData[0] = 0xe8; dData[1] = 0x03;
 		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "Amplify", dData, 4))
 			return false;
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "ConfigCLSID", "{86062e00-25f2-11ef-8003-444553540000}"))
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, root, "ConfigCLSID", "{D46464FB-0810-0001-A675-AB5A481BAC79}"))
 			return false;
 	// Root ----------------
 
@@ -219,7 +219,7 @@ public:
 	// ForceFeedback -------
 		const char* oemPath = "SYSTEM\\CurrentControlSet\\Control\\MediaProperties\\PrivateProperties\\Joystick\\OEM\\VID_0810&PID_0001\\OEMForceFeedback";
 
-		if (!SetInRegistry(HKEY_LOCAL_MACHINE, oemPath, "CLSID", "{86062e00-25f2-11ef-8003-444553540000}"))
+		if (!SetInRegistry(HKEY_LOCAL_MACHINE, oemPath, "CLSID", "{D46464FB-0810-0001-A675-AB5A481BAC79}"))
 			return false;
 
 		const byte attrVal[] = {

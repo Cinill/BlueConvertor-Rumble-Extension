@@ -1,18 +1,19 @@
 # BlueConvertor Rumble Extension
 
 Driver to enable the rumble feature of the Twin USB Joystick (Blue convertor) on **VID_0810&PID_0001** adapters. 
-
-## TODO
 Both ports work simultaneously.
 
-## Instalation
+## TODO
+Fix eternal rumble.
+
+### Instalation
 Use the latest installer found here:
 
 https://github.com/Cinill/BlueConvertor-Rumble-Extension/releases
 
 **It is highly recommended that you use HidHide and xOutput 3 with this driver for the best experience.**
 
-### Credits
+#### Credits
 
 NishiyamaPedro  - Original project: https://github.com/NishiyamaPedro/DualShock-Rumble-Extension
 
