@@ -1,3 +1,4 @@
+TEST
 # BlueConvertor Rumble Extension
 
 Driver to enable the rumble feature of the Twin USB Joystick (Blue convertor) on **VID_0810&PID_0001** adapters. 
