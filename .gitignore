@@ -10,3 +10,4 @@ obj/
 *.opendb
 *.suo
 *.user
+/UpgradeLog.htm
