@@ -32,10 +32,13 @@ namespace vibration {
 
 	public:
 		static void SetHidDevicePath(LPWSTR path, DWORD dwID);
-		static void StartEffect(DWORD dwEffectID, LPCDIEFFECT peff, DWORD dwID);
-		static void StopEffect(DWORD dwEffectID, DWORD dwID);
-		static void StopAllEffects(DWORD dwID);
+		static HRESULT EnqueueEffect(DWORD dwDeviceID, DWORD dwInternalEffectType, LPDWORD lpdwDnloadID, LPCDIEFFECT lpEffect, DWORD dwFlags);
+		static void DequeueEffect(DWORD dwDeviceID, DWORD dwInternalEffectType);
+		static void DequeueAllEffects(DWORD dwDeviceID);
+		static void Pause(DWORD dwDeviceID);
+		static void Resume(DWORD dwDeviceID);
 		static void Reset(DWORD dwID, std::thread* t = NULL);
+		static char* EffectNameFromCET(DWORD fxId);
 	};
 
 }

@@ -39,6 +39,9 @@
     <ClInclude Include="vibration\VibrationController.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="vibration\dieffectattributes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">

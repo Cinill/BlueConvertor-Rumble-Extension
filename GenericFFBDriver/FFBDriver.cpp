@@ -1,27 +1,54 @@
 
 #include "FFBDriver.h"
 #include "vibration/VibrationController.h"
-#include <fstream>
 
-void LogMessage(const char* msg) {
 #ifdef _DEBUG
-	SYSTEMTIME st;
-	GetSystemTime(&st);
-	char buffer[256];
+#include <windows.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <stdarg.h>
 
-	sprintf_s(buffer, "[ %04d-%02d-%02d %02d:%02d:%02d.%03d ] %s",
+#define LOGPATH "D:\\"
+#define LOGFILE "ffbdriver.log"
+
+void LogMessage(const char* fmt, ...) {
+	va_list args;
+	SYSTEMTIME st;
+	struct stat statdres = { 0 }, statfres = { 0 };
+
+	// Check if the log file exists
+	if (stat(LOGPATH LOGFILE, &statfres) == 0) {
+		// File exists, check if it's writable
+		if (!(statfres.st_mode & S_IWRITE)) return;
+	}
+	else {
+		// File doesn't exist, check if the directory exists and is writable
+		if (stat(LOGPATH, &statdres) != 0) return; // No log directory at all
+		if (!(statdres.st_mode & S_IFDIR)) return; // Log path is not a directory
+		if (!(statdres.st_mode & S_IWRITE)) return; // Log directory is not writable
+	}
+
+	FILE* log_file = fopen(LOGPATH LOGFILE, "a");
+	if (log_file == NULL) return; // Failed to open log file
+
+	GetSystemTime(&st);
+
+	// Write timestamp to log file
+	fprintf_s(log_file, "%04d-%02d-%02d %02d:%02d:%02d.%03d UTC: ",
 		st.wYear, st.wMonth, st.wDay,
 		st.wHour, st.wMinute, st.wSecond,
-		st.wMilliseconds, msg);
+		st.wMilliseconds);
 
-	printf(buffer);
+	// Write the log message
+	va_start(args, fmt);
+	vfprintf_s(log_file, fmt, args);
+	va_end(args);
 
-	std::ofstream outfile;
-	outfile.open("D:\\driverlog.txt", std::ios_base::app);
-	outfile << buffer;
-	outfile.close();
-#endif
+	// Write a newline and close the file
+	fputc('\n', log_file);
+	fclose(log_file);
 }
+#endif
 
 FFBDriver::FFBDriver()
 {
@@ -43,6 +70,9 @@ STDMETHODIMP FFBDriver::QueryInterface(REFIID riid, LPVOID *ppv)
 		_AddRef();
 		return S_OK;
 	}
+#ifdef _DEBUG
+	LogMessage("Query interface called.");
+#endif
 	return E_NOINTERFACE;
 }
 
@@ -57,10 +87,9 @@ HRESULT STDMETHODCALLTYPE FFBDriver::DeviceID(
 	LPDIHIDFFINITINFO lpDIHIDInitInfo = (LPDIHIDFFINITINFO)lpInfo;
 
 #ifdef _DEBUG
-	char buff[100];
-	sprintf_s(buff, "DeviceID\n\tdwDIVer=0x%04x\n\tdwExternalID=0x%04x\n\tfBegin=0x%04x\n\tdwInternalId=0x%04x\n\n",
+	LogMessage("DeviceID\n\tdwDIVer=0x%04x\n\tdwExternalID=0x%04x\n\tfBegin=0x%04x\n\tdwInternalId=0x%04x",
 		dwDIVer, dwExternalID, fBegin, dwInternalId);
-	LogMessage(buff);
+
 #endif
 
 	vibration::VibrationController::SetHidDevicePath(lpDIHIDInitInfo->pwszDeviceInterface, dwExternalID);
@@ -70,7 +99,7 @@ HRESULT STDMETHODCALLTYPE FFBDriver::DeviceID(
 
 HRESULT STDMETHODCALLTYPE FFBDriver::GetVersions(LPDIDRIVERVERSIONS lpVersions) {
 #ifdef _DEBUG
-	LogMessage("GetVersions\n");
+	LogMessage("GetVersions");
 #endif
 
 	lpVersions->dwFFDriverVersion = 0x100;
@@ -81,7 +110,7 @@ HRESULT STDMETHODCALLTYPE FFBDriver::GetVersions(LPDIDRIVERVERSIONS lpVersions) 
 }
 HRESULT STDMETHODCALLTYPE FFBDriver::Escape(THIS_ DWORD, DWORD, LPDIEFFESCAPE) {
 #ifdef _DEBUG
-	LogMessage("Escape!\n");
+	LogMessage("Escape!");
 #endif
 	return S_OK;
 }
@@ -90,10 +119,9 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SetGain(
 	DWORD dwGain) 
 {
 #ifdef _DEBUG
-	char buff[100];
-	sprintf_s(buff, "SetGain\n\tdwID=0x%04x\n\tdwGain=0x%04x\n\n",
+	LogMessage("SetGain\n\tdwID=0x%04x\n\tdwGain=0x%04x",
 		dwID, dwGain);
-	LogMessage(buff);
+
 #endif
 
 	/*
@@ -104,7 +132,7 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SetGain(
 		currentGain = (byte)newGain;
 	*/
 
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }
 
 HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
@@ -112,10 +140,15 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
 	DWORD dwCommand) 
 {
 #ifdef _DEBUG
-	char buff[100];
-	sprintf_s(buff, "SendForceFeedbackCommand\n\tdwID=0x%04x\n\tdwCommand=0x%04x\n\n",
+	LogMessage("SendForceFeedbackCommand\n\tdwID=0x%04x\n\tdwCommand=0x%04x",
 		dwID, dwCommand);
-	LogMessage(buff);
+	LogMessage("Command match table:\n"
+		" [%c] Reset                [%c] Stop All Effects      [%c] Pause\n"
+		" [%c] Continue (resume)    [%c] Set Actuators on      [%c] Set Actuators off",
+#define yn(cmd) dwCommand & cmd ? 'x' : ' '
+		yn(DISFFC_RESET), yn(DISFFC_STOPALL), yn(DISFFC_PAUSE),
+		yn(DISFFC_CONTINUE), yn(DISFFC_SETACTUATORSON), yn(DISFFC_SETACTUATORSOFF));
+#undef yn
 #endif
 
 	switch (dwCommand) {
@@ -124,11 +157,15 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
 		break;
 
 	case DISFFC_STOPALL:
-		vibration::VibrationController::StopAllEffects(dwID);
+		vibration::VibrationController::DequeueAllEffects(dwID);
 		break;
 
 	case DISFFC_PAUSE:
+		vibration::VibrationController::Pause(dwID);
+		break;
 	case DISFFC_CONTINUE:
+		vibration::VibrationController::Resume(dwID);
+		break;
 	case DISFFC_SETACTUATORSON:
 	case DISFFC_SETACTUATORSOFF:
 		break;
@@ -139,51 +176,59 @@ HRESULT STDMETHODCALLTYPE FFBDriver::SendForceFeedbackCommand(
 
 HRESULT STDMETHODCALLTYPE FFBDriver::GetForceFeedbackState(THIS_ DWORD, LPDIDEVICESTATE) {
 #ifdef _DEBUG
-	LogMessage("GetForceFeedbackState!\n");
+	LogMessage("GetForceFeedbackState!");
 #endif
-	return S_OK;
+	return DIERR_UNSUPPORTED;
 }
 
 HRESULT STDMETHODCALLTYPE FFBDriver::DownloadEffect(
-	DWORD       dwID,
-	DWORD       dwEffectID,
-	LPDWORD     pdwEffect,
-	LPCDIEFFECT peff,
+	DWORD dwDeviceID,
+	DWORD dwInternalEffectType,
+	LPDWORD lpdwDnloadID,
+	LPCDIEFFECT lpEffect,
 	DWORD       dwFlags) 
 {
 #ifdef _DEBUG
-	char buff[100];
-	sprintf_s(buff, "DownloadEffect\n\tdwID=0x%04x\n\tdwEffectID=0x%04x\n\tdwFlags=0x%04x\n\n",
-		dwID, dwEffectID, dwFlags);
 
-	LogMessage(buff);
+
+	LogMessage("DownloadEffect: dwID:0x%04x, dwEffectID:0x%04x, dwFlags:0x%04x, peff->dwDuration:%4lu, gain:%4lu",
+		dwDeviceID, dwInternalEffectType, dwFlags, lpEffect->dwDuration, lpEffect->dwGain);
+	LogMessage("Modification flags (dwFlags):\n"
+		" [%c] duration             [%c] sample period         [%c] gain\n"
+		" [%c] trigger button       [%c] trig.btn.repeat intvl [%c] axes\n"
+		" [%c] direction            [%c] envelope              [%c] type-specific params\n"
+		" [%c] force restart        [%c] deny restart          [%c] don't download",
+#define yn(mask) dwFlags & mask ? 'x' : ' '
+		yn(DIEP_DURATION), yn(DIEP_SAMPLEPERIOD), yn(DIEP_GAIN), yn(DIEP_TRIGGERBUTTON), yn(DIEP_TRIGGERREPEATINTERVAL),
+		yn(DIEP_AXES), yn(DIEP_DIRECTION), yn(DIEP_ENVELOPE), yn(DIEP_TYPESPECIFICPARAMS), yn(DIEP_START),
+		yn(DIEP_NORESTART), yn(DIEP_NODOWNLOAD));
+#undef yn
 #endif
 
-	vibration::VibrationController::StartEffect(dwEffectID, peff, dwID);
-	return S_OK;
+	return vibration::VibrationController::EnqueueEffect(dwDeviceID, dwInternalEffectType, lpdwDnloadID, lpEffect, dwFlags);
 }
 
 HRESULT STDMETHODCALLTYPE FFBDriver::DestroyEffect(DWORD, DWORD) {
 #ifdef _DEBUG
-	LogMessage("DestroyEffect!\n");
+	LogMessage("DestroyEffect!");
 #endif
 	return S_OK;
 }
 HRESULT STDMETHODCALLTYPE FFBDriver::StartEffect(DWORD, DWORD, DWORD, DWORD) {
 #ifdef _DEBUG
-	LogMessage("StartEffect!\n");
+	LogMessage("StartEffect!");
 #endif
 	return S_OK;
 }
 HRESULT STDMETHODCALLTYPE FFBDriver::StopEffect(DWORD dwID, DWORD dwEffect) {
 #ifdef _DEBUG
-	LogMessage("StopEffect!\n");
+	LogMessage("StopEffect!");
 #endif
 	return S_OK;
 }
 HRESULT STDMETHODCALLTYPE FFBDriver::GetEffectStatus(DWORD, DWORD, LPDWORD) {
 #ifdef _DEBUG
-	LogMessage("GetEffectStatus!\n");
+	LogMessage("GetEffectStatus!");
 #endif
 	return S_OK;
 }
