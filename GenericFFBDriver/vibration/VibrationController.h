@@ -5,14 +5,17 @@
 #include <vector>
 #include <map>
 
-namespace vibration {
-
+namespace vibration
+{
 	class VibrationController
 	{
-		class VibrationThreadDeleter {
+		class VibrationThreadDeleter
+		{
 		public:
-			void operator()(std::thread* t) const {
-				if (t->joinable()) {
+			void operator()(std::thread* t) const
+			{
+				if (t->joinable())
+				{
 					VibrationController::Reset(0, t);
 				}
 				else
@@ -23,23 +26,22 @@ namespace vibration {
 		static std::vector<std::wstring> hidDevPath;
 		static std::mutex mtxSync;
 		static std::unique_ptr<std::thread, VibrationThreadDeleter> thrVibration[2];
-		
+
 		VibrationController();
 		~VibrationController();
 
-		static void StartVibrationThread(DWORD dwID);
-		static void VibrationThreadEntryPoint(DWORD dwID);
+		static void StartVibrationThread(DWORD dwDeviceID);
+		static void VibrationThreadEntryPoint(DWORD dwDeviceID);
 
 	public:
-		static void SetHidDevicePath(LPWSTR path, DWORD dwID);
-		static HRESULT EnqueueEffect(DWORD dwDeviceID, DWORD dwInternalEffectType, LPDWORD lpdwDnloadID, LPCDIEFFECT lpEffect, DWORD dwFlags);
+		static void SetHidDevicePath(LPWSTR path, DWORD dwDeviceID);
+		static HRESULT EnqueueEffect(DWORD dwDeviceID, DWORD dwInternalEffectType, LPDWORD lpdwDnloadID,
+		                             LPCDIEFFECT lpEffect, DWORD dwFlags);
 		static void DequeueEffect(DWORD dwDeviceID, DWORD dwInternalEffectType);
 		static void DequeueAllEffects(DWORD dwDeviceID);
 		static void Pause(DWORD dwDeviceID);
 		static void Resume(DWORD dwDeviceID);
-		static void Reset(DWORD dwID, std::thread* t = NULL);
+		static void Reset(DWORD dwDeviceID, std::thread* t = NULL);
 		static char* EffectNameFromCET(DWORD fxId);
 	};
-
 }
-

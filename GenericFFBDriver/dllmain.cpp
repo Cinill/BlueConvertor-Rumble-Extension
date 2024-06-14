@@ -9,11 +9,11 @@ HANDLE g_module;
 #include "FFBDriver.h"
 
 long * CObjRoot::p_ObjCount = NULL; // this is just because i didnt want to use any globals inside the
-									// class framework.
+// class framework.
 
 BOOL APIENTRY DllMain(HANDLE hModule,
-	DWORD  ul_reason_for_call,
-	LPVOID lpReserved
+                      DWORD ul_reason_for_call,
+                      LPVOID lpReserved
 )
 {
 	switch (ul_reason_for_call)
@@ -32,27 +32,26 @@ BOOL APIENTRY DllMain(HANDLE hModule,
 }
 
 
-
-STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID *ppvOut)
+STDAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, LPVOID* ppvOut)
 {
 	*ppvOut = NULL;
 	if (IsEqualIID(rclsid, CLSID_FFBDriver))
 	{
 		// declare a classfactory for CmyInterface class 
-		CClassFactory<FFBDriver> *pcf = new CClassFactory<FFBDriver>;
+		CClassFactory<FFBDriver>* pcf = new CClassFactory<FFBDriver>;
 		return pcf->QueryInterface(riid, ppvOut);
 	}
 	return CLASS_E_CLASSNOTAVAILABLE;
 }
 
-STDAPI  DllCanUnloadNow(void)
+STDAPI DllCanUnloadNow(void)
 {
 	return (g_cRefThisDll == 0 ? S_OK : S_FALSE);
 }
 
 STDAPI DllRegisterServer(void)
 {
-	CDllRegistrar registrar;  // this class should create standard entries in registry 
+	CDllRegistrar registrar; // this class should create standard entries in registry
 	CHAR path[MAX_PATH];
 	GetModuleFileNameA((HMODULE)g_module, path, MAX_PATH);
 	return registrar.RegisterObject(CLSID_FFBDriver, "GenericFFBDriver", "FFBDriver", path) ? S_OK : S_FALSE;
@@ -63,4 +62,3 @@ STDAPI DllUnregisterServer(void)
 	CDllRegistrar registrar;
 	return registrar.UnRegisterObject(CLSID_FFBDriver, "GenericFFBDriver", "FFBDriver") ? S_OK : S_FALSE;
 }
-

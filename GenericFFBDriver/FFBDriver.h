@@ -7,12 +7,12 @@
 #include "ComBase.h"
 
 // {D46464FB-0810-0001-A675-AB5A481BAC79}
-_declspec(selectany) GUID CLSID_FFBDriver = 
-    { 0xD46464FB, 0x0810, 0x0001, { 0xA6, 0x75, 0xAB, 0x5A, 0x48, 0x1B, 0xAC, 0x79 } };
+_declspec(selectany) GUID CLSID_FFBDriver =
+	{0xD46464FB, 0x0810, 0x0001, {0xA6, 0x75, 0xAB, 0x5A, 0x48, 0x1B, 0xAC, 0x79}};
 
-// {D46464FC-0810-0001-A675-AB5A481BAC79}
-_declspec(selectany) GUID CLSID_SettingDriver =
-{ 0xD46464FC, 0x0810, 0x0001, { 0xA6, 0x75, 0xAB, 0x5A, 0x48, 0x1B, 0xAC, 0x79 } };
+//// {D46464FC-0810-0001-A675-AB5A481BAC79}
+//_declspec(selectany) GUID CLSID_SettingDriver =
+//	{0xD46464FC, 0x0810, 0x0001, {0xA6, 0x75, 0xAB, 0x5A, 0x48, 0x1B, 0xAC, 0x79}};
 
 //IID_IDirectInputEffectDriver
 
@@ -23,7 +23,9 @@ public:
 	FFBDriver();
 	~FFBDriver();
 
-	STDMETHODIMP FFBDriver::QueryInterface(REFIID riid, LPVOID *ppv) override;
+	STDMETHODIMP FFBDriver::QueryInterface(REFIID riid, LPVOID* ppv);
+
+
 
 	HRESULT STDMETHODCALLTYPE DeviceID(DWORD, DWORD, DWORD, DWORD, LPVOID);
 	HRESULT STDMETHODCALLTYPE GetVersions(LPDIDRIVERVERSIONS);
@@ -37,4 +39,3 @@ public:
 	HRESULT STDMETHODCALLTYPE StopEffect(DWORD, DWORD);
 	HRESULT STDMETHODCALLTYPE GetEffectStatus(DWORD, DWORD, LPDWORD);
 };
-

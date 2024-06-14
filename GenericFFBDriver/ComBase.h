@@ -1,4 +1,3 @@
-
 // ComBase.h 
 // a very simple COM server without MFC or ATL by :  Shoaib Ali
 // you can send your comments at alleey@usa.net
@@ -20,16 +19,16 @@
 class CSingleThreaded
 {
 protected:
-	STDMETHODIMP_(ULONG) Increment(long &reflong)  
+	STDMETHODIMP_(ULONG) Increment(long& reflong)
 	{
-		reflong ++;
-		return reflong; 
+		reflong++;
+		return reflong;
 	}
 
-	STDMETHODIMP_(ULONG) Decrement(long &reflong)
+	STDMETHODIMP_(ULONG) Decrement(long& reflong)
 	{
-		reflong --; 
-		return reflong; 
+		reflong--;
+		return reflong;
 	}
 };
 
@@ -39,16 +38,16 @@ protected:
 class CMultiThreaded
 {
 protected:
-	STDMETHODIMP_(ULONG) Increment(long &reflong) 
-	{ 
-		::InterlockedIncrement(&reflong); 
-		return reflong; 
+	STDMETHODIMP_(ULONG) Increment(long& reflong)
+	{
+		::InterlockedIncrement(&reflong);
+		return reflong;
 	}
 
-	STDMETHODIMP_(ULONG) Decrement(long &reflong) 
+	STDMETHODIMP_(ULONG) Decrement(long& reflong)
 	{
-		::InterlockedDecrement(&reflong); 
-		return reflong; 
+		::InterlockedDecrement(&reflong);
+		return reflong;
 	}
 };
 
@@ -58,27 +57,28 @@ protected:
 class CObjRoot
 {
 protected:
-	long	m_cRef;
-protected:
-	STDMETHOD_(ULONG,_AddRef)() =0;
-	STDMETHOD_(ULONG,_Release)() =0;
+	long m_cRef;
+	STDMETHOD_(ULONG, _AddRef)() =0;
+	STDMETHOD_(ULONG, _Release)() =0;
+
 public:
-	static long *p_ObjCount;
+	static long* p_ObjCount;
 };
 
 // interface implementation class that delegates AddRef and Release to _AddRef and _Release in 
 // ComBase that is inherited virtualy..
 // 
 template <class Interface>
-class InterfaceImpl: public virtual CObjRoot, public Interface 
+class InterfaceImpl : public virtual CObjRoot, public Interface
 {
 public:
-	STDMETHOD(QueryInterface)(REFIID riid,LPVOID *ppv) = 0; 
-	STDMETHODIMP_(ULONG) AddRef() 
+	STDMETHOD(QueryInterface)(REFIID riid, LPVOID* ppv) = 0;
+	STDMETHODIMP_(ULONG) AddRef()
 	{
-		return _AddRef(); 
+		return _AddRef();
 	}
-	STDMETHODIMP_(ULONG) Release() 
+
+	STDMETHODIMP_(ULONG) Release()
 	{
 		return _Release();
 	}
@@ -87,29 +87,33 @@ public:
 // this mandatory class manages the life of the COM object it uses a perticular threading model
 // for reference count management..
 //
-template <class ThreadModel = CSingleThreaded >
-class CComBase  : public virtual CObjRoot ,  public ThreadModel
+template <class ThreadModel = CSingleThreaded>
+class CComBase : public virtual CObjRoot, public ThreadModel
 {
-
 public:
-	CComBase() {};
-	virtual ~CComBase() {};
+	CComBase()
+	{
+	};
+
+	virtual ~CComBase()
+	{
+	};
 
 protected:
-
-	STDMETHODIMP_(ULONG) _AddRef() 
+	STDMETHODIMP_(ULONG) _AddRef() override
 	{
-		if(p_ObjCount)
-			ThreadModel::Increment(*p_ObjCount); 
-		return ThreadModel::Increment(m_cRef); 
+		if (p_ObjCount)
+			ThreadModel::Increment(*p_ObjCount);
+		return ThreadModel::Increment(m_cRef);
 	}
-	STDMETHODIMP_(ULONG) _Release() 
+
+	STDMETHODIMP_(ULONG) _Release() override
 	{
-		long Value = ThreadModel::Decrement(m_cRef); 
-		if(!m_cRef)
+		long Value = ThreadModel::Decrement(m_cRef);
+		if (!m_cRef)
 			delete this;
-		if(p_ObjCount)
-			ThreadModel::Decrement(*p_ObjCount); 
+		if (p_ObjCount)
+			ThreadModel::Decrement(*p_ObjCount);
 		return Value;
 	}
 };
